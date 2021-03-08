@@ -43,15 +43,11 @@ build:image:
       then
         echo THERE IS NO IMAGE IN THE CONTAINER REGISTRY OF PROJECT.
         echo FIRST BUILD
+        docker build --pull --tag $DEV_IMAGE .
       else
         docker pull $LAST_UPDATED_IMAGE
+        docker build --pull --cache-from $LAST_UPDATED_IMAGE --tag $DEV_IMAGE .
       fi
-    - >
-      docker build
-      --pull
-      --cache-from $LAST_UPDATED_IMAGE
-      --tag $DEV_IMAGE
-      .
     - docker push $DEV_IMAGE
 
 # test:qasl:

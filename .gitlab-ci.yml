@@ -41,6 +41,7 @@ build:image:
         echo FIRST BUILD
       else
         docker pull $LAST_UPDATED_IMAGE
+      fi
     - >
       docker build
       --pull

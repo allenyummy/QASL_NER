@@ -34,7 +34,13 @@ build:image:
       LAST_UPDATED_IMAGE=$(echo $OUTPUT | jq -C -r '.[].tags | .[0].location')
       echo LAST_UPDATED_IMAGE: $LAST_UPDATED_IMAGE
       echo DEV_IMAGE: $DEV_IMAGE
-    - docker pull $LAST_UPDATED_IMAGE
+    - |
+      if [ "$OUTPUT" == "[]" ]
+      then
+        echo THERE IS NO IMAGE IN THE CONTAINER REGISTRY OF PROJECT.
+        echo FIRST BUILD
+      else
+        docker pull $LAST_UPDATED_IMAGE
     - >
       docker build
       --pull

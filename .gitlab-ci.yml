@@ -43,15 +43,15 @@ build:image:
       .
     - docker push $DEV_IMAGE
 
-test:seqhelper:
-  image: $DEV_IMAGE
-  stage: test
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "master"'
-      when: never
-    - when: on_success
-  script:
-    - make test
+# test:qasl:
+#   image: $DEV_IMAGE
+#   stage: test
+#   rules:
+#     - if: '$CI_COMMIT_BRANCH == "master"'
+#       when: never
+#     - when: on_success
+#   script:
+#     - make test
 
 release:image:
   image: docker:19.03.12

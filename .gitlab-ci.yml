@@ -23,8 +23,10 @@ build:image:
     - if: '$CI_COMMIT_BRANCH == "master"'
       when: never
     - changes:
-        - requirements.txt
-        - Dockerfile
+      - requirements.txt
+      - Dockerfile
+      when: always
+    - when: never
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - apk update && apk add curl jq

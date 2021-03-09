@@ -22,7 +22,8 @@ build:image:
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
       when: never
-    - changes:
+    - if: $CI_PIPELINE_SOURCE == "push"
+      changes:
         - requirements.txt
         - Dockerfile
   before_script:

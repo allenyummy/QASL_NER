@@ -7,9 +7,11 @@ import os
 import sys
 
 sys.path.append(os.getcwd())
+import json
 from typing import List, Dict, Union
+from datetime import datetime
 import xml.etree.ElementTree as ET
-from utils.data_structure import mrc
+from utils.data_structure.mrc import AnswerStruct, DataStruct, MRCStruct, trans2dict
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -20,20 +22,19 @@ class GENIA:
         self.file_path = file_path
         self.root = self.load_and_get_root()
 
-        self.ARTICLE_KEYWORDS = "article"
+        self.ARTICLE_KEYWORD = "article"
+        self.TITLE_KEYWORD = "title"
+        self.ABSTRACT_KEYWORD = "abstract"
         self.MEDLINE_XPATH = "./articleinfo/bibliomisc"
-        self.TITLE_XPATH = "./title/"
-        self.ABSTRACT_XPATH = "./abstract/"
-        self.MARK_KEYWORD = "cons"
-        self.ANS_KEYWORD = "lex"
-        self.TYPE_KEYWORD = "sem"
-        self.ANS_SPLITER = "_"
+        self.TITLE_XPATH = f"./{self.TITLE_KEYWORD}/"
+        self.ABSTRACT_XPATH = f"./{self.ABSTRACT_KEYWORD}/"
 
-        self.MULTI_ANS_AND_CONNECTOR = "and"
-        self.MULTI_ANS_OR_CONNECTOR = "or"
+        self.MARK_KEYWORD = "cons"
+        self.MARK_XPATH = f".//{self.MARK_KEYWORD}"
+        self.TYPE_KEYWORD = "sem"
+
         self.MULTI_ANS_AND_INDICATOR = "(AND"
         self.MULTI_ANS_OR_INDICATOR = "(OR"
-        self.MULTI_ANS_INDICATOR = "*"
 
         self.LABEL_LIST = ["G#DNA", "G#RNA", "G#protein", "G#cell_line", "G#cell_type"]
 
@@ -42,137 +43,176 @@ class GENIA:
         root = tree.getroot()
         return root
 
+    def get_mrc_json(self, built_time, version, output_file_path):
+        data = self.parse()
+        mrc = MRCStruct(built_time=built_time, version=version, data=data)
+        mrc_dict = trans2dict(mrc)
+        logger.info(mrc)
+        logger.info(f"SIZE: {len(mrc)}")
+        with open(output_file_path, "w", encoding="utf-8") as fout:
+            out = json.dumps(mrc_dict, indent=4, ensure_ascii=False)
+            fout.write(out)
+
     def parse(self):
-
-        for i, child in enumerate(self.root.iter(self.ARTICLE_KEYWORDS)):
-            # get medline text
+        data = list()
+        for i, child in enumerate(self.root.iter(self.ARTICLE_KEYWORD)):
             medline = child.find(self.MEDLINE_XPATH).text
+            sentence_idx = 0
+            for category, xpath in zip(
+                [self.TITLE_KEYWORD, self.ABSTRACT_KEYWORD],
+                [self.TITLE_XPATH, self.ABSTRACT_XPATH],
+            ):
+                for w in child.iterfind(xpath):
+                    text_list = " ".join(w.itertext()).split()
+                    mark_list = self.get_mark_list(w)
+                    ans_list = self.get_answer_position_from_text(text_list, mark_list)
+                    mrc_ds = self.format(
+                        medline, category, sentence_idx, text_list, ans_list
+                    )
+                    sentence_idx += 1
+                    data.append(mrc_ds)
 
-            ## TITLE
-            text_list = self.get_text_list(child, self.TITLE_XPATH)
-            mark_list = self.get_mark_list(child, self.TITLE_XPATH, self.MARK_KEYWORD)
-            mark_list = self.restore_multiple_answers_of_mark_list(mark_list)
-            mark_list = self.prune_unnecessary_marks_and_transform(mark_list)
+                    if i < 5:
+                        logger.info(f"MEDLINE: {medline}")
+                        logger.info(f"{category.upper()}: {' '.join(text_list)}")
+                        logger.info(f"MARK: {mark_list}")
+                        logger.info(f"ANS: {ans_list}")
+                        logger.info(f"MRC_DS: {mrc_ds}")
+                        logger.info("------------")
+        return data
 
-            logger.info(f"MEDLINE: {medline}")
-            logger.info(f"TITLE: {' '.join(text_list)}")
-            logger.info(f"MARK: {mark_list}")
-
-            # ans_list = self.get_answer_position_from_text(text_list, mark_list)
-
-            ## ABSTRACT
-
-            logger.info("------------")
-
-    def get_text_list(self, child, xpath: str) -> List[str]:
-        sent_list = [w for w in child.find(xpath).itertext()]
-        sent_list = self.delete_space(sent_list)
-        return sent_list
-
-    def get_mark_list(self, child, xpath: str, keyword: str) -> List[Dict[str, str]]:
-        mark_list = [label.attrib for label in child.find(xpath).iter(keyword)]
+    def get_mark_list(self, w) -> List[AnswerStruct]:
+        mark_list = list()
+        for mark in w.iterfind(self.MARK_XPATH):
+            type = mark.get(self.TYPE_KEYWORD)
+            if type:
+                type = self.check_and_restore_multi_ans_type(type)
+                text = "".join(mark.itertext())
+                mrc_as = AnswerStruct(
+                    type=type, text=text, start_pos=None, end_pos=None
+                )
+                mark_list.append(mrc_as)
         return mark_list
 
     def get_answer_position_from_text(
-        self, text_list: List[str], mark_list: List[Dict[str, str]]
-    ):
-        return NotImplementedError
+        self, text_list: List[str], mark_list: List[AnswerStruct]
+    ) -> List[AnswerStruct]:
 
-    def restore_multiple_answers_of_mark_list(
-        self, mark_list: List[Dict[str, str]]
-    ) -> List[Dict[str, str]]:
+        mark_list_pt = self.prune_unnecessary_marks_and_transform(mark_list)
+        ans_list = list()
+        pointer = 0
+        for mark in mark_list_pt:
+            ans_text = mark.text
+            ans_text_list = mark.text.split()
+            type = mark.type
 
-        restore_mark_list = list()
-        temp = list()
-        restore_type = ""
-        restore_connector = ""
-        for mark in mark_list:
-            type = mark.get(self.TYPE_KEYWORD, None)
-            if type:
-                if (
-                    self.MULTI_ANS_AND_INDICATOR not in type
-                    and self.MULTI_ANS_OR_INDICATOR not in type
-                ):
-                    if temp:
-                        restore_ans_text = self.put_and_or_string_and_transform(
-                            temp, restore_connector
-                        )
-                        restore_mark = {
-                            self.ANS_KEYWORD: restore_ans_text,
-                            self.TYPE_KEYWORD: restore_type,
-                        }
-                        restore_mark_list.append(restore_mark)
-                        temp = list()
-                    restore_mark_list.append(mark)
-                else:
-                    if self.MULTI_ANS_AND_INDICATOR in type:
-                        restore_connector = self.MULTI_ANS_AND_CONNECTOR
-                    else:
-                        restore_connector = self.MULTI_ANS_OR_CONNECTOR
-                    restore_type = type.split()[1]
-            else:
-                ans_text = mark[self.ANS_KEYWORD]
-                temp.append(ans_text)
+            pointer = self.lookback(ans_list, type, ans_text, pointer)
 
-        if temp:
-            restore_ans_text = self.put_and_or_string_and_transform(
-                temp, restore_connector
+            start_pos, end_pos = self.find_start_and_end(
+                text_list, ans_text_list, pointer
             )
-            restore_mark = {
-                self.ANS_KEYWORD: restore_ans_text,
-                self.TYPE_KEYWORD: restore_type,
-            }
-            restore_mark_list.append(restore_mark)
-            temp = list()
+            mrc_as = AnswerStruct(
+                type=type, text=ans_text, start_pos=start_pos, end_pos=end_pos
+            )
+            ans_list.append(mrc_as)
+        return ans_list
 
-        return restore_mark_list
-
-    def put_and_or_string_and_transform(self, temp: List[str], connector: str) -> str:
-        and_or_pos = self.find_and_or_string_position(temp)
-        restore_ans_text_list = [t.strip(self.MULTI_ANS_INDICATOR) for t in temp]
-        restore_ans_text_list.insert(and_or_pos, connector)
-        restore_ans_text = self.ANS_SPLITER.join(restore_ans_text_list)
-        return restore_ans_text
-
-    def find_and_or_string_position(self, temp: List[str]) -> int:
-        pos = 0
-        for t in temp:
-            if self.MULTI_ANS_INDICATOR == t[-1]:
-                pos += 1
-            elif self.MULTI_ANS_INDICATOR == t[0]:
-                pos -= 1
-        return pos
+    def check_and_restore_multi_ans_type(self, type: str) -> str:
+        if any(
+            k in type
+            for k in [self.MULTI_ANS_AND_INDICATOR, self.MULTI_ANS_OR_INDICATOR]
+        ):
+            type = type.split()[1]
+        return type
 
     def prune_unnecessary_marks_and_transform(
-        self, mark_list: List[Dict[str, str]]
-    ) -> List[Dict[str, str]]:
-        output = list()
+        self, mark_list: List[AnswerStruct]
+    ) -> List[AnswerStruct]:
+        mark_list_pt = list()
         for mark in mark_list:
-            type = mark[self.TYPE_KEYWORD]
             for label in self.LABEL_LIST:
-                if label in type:
-                    trans_mark = {
-                        self.ANS_KEYWORD: mark[self.ANS_KEYWORD],
-                        self.TYPE_KEYWORD: label,
-                    }
-                    output.append(trans_mark)
-        return output
+                if label in mark.type:
+                    mrc_as = AnswerStruct(
+                        type=label,
+                        text=mark.text,
+                        start_pos=mark.start_pos,
+                        end_pos=mark.end_pos,
+                    )
+                    mark_list_pt.append(mrc_as)
+        return mark_list_pt
+
+    def format(
+        self,
+        medline: str,
+        category: str,
+        index: int,
+        text_list: List[str],
+        ans_list: List[dict],
+    ) -> DataStruct:
+
+        pid = f"{medline}-{category}-{index}"
+        passage = " ".join(text_list)
+        answers = list()
+        for ans in ans_list:
+            mrc_as = AnswerStruct(
+                type=ans.type,
+                text=ans.text,
+                start_pos=ans.start_pos,
+                end_pos=ans.end_pos,
+            )
+            assert self.check_not_empty(mrc_as)
+            answers.append(mrc_as)
+        mrc_ds = DataStruct(pid, passage, answers)
+        return mrc_ds
 
     @staticmethod
-    def delete_space(input: List[str]) -> List[str]:
-        return [x for x in input if x != " "]
+    def lookback(
+        ans_list: List[AnswerStruct],
+        appending_ans_type: str,
+        appending_ans_text: str,
+        pointer: int,
+    ) -> int:
+        if ans_list:
+            last_pointer_in_ans = ans_list[-1].start_pos
+
+        for prev_ans in ans_list:
+            prev_ans_type = prev_ans.type
+            prev_ans_text = prev_ans.text
+
+            if prev_ans_type == appending_ans_type:
+                if (
+                    appending_ans_text in prev_ans_text
+                    or prev_ans_text in appending_ans_text
+                ):
+                    if prev_ans.start_pos > last_pointer_in_ans:
+                        pointer = prev_ans.start_pos
+                    else:
+                        pointer = last_pointer_in_ans
+        return pointer
 
     @staticmethod
-    def soft_match(string: str, substring: str) -> bool:
-        if substring in string:
-            return True
-        return False
-
-    @staticmethod
-    def find_sublist_in_list(
-        search_space: List[str], sub_space: List[str]
+    def find_start_and_end(
+        search_space: List[str], sub_space: List[str], index: int
     ) -> Union[int, int]:
-        return NotImplementedError
+        start_pos = -1
+        end_pos = -1
+        text = " ".join(search_space).lower()
+        sub_text = " ".join(sub_space).lower()
+        if index == 0:
+            trans_index = 0
+        else:
+            trans_index = len(" ".join(search_space[0:index])) + 1
+        start_pos = text.find(sub_text, trans_index)
+        start_pos = len(text[0:start_pos].split())
+        end_pos = start_pos + len(sub_space)
+        return start_pos, end_pos
+
+    @staticmethod
+    def check_not_empty(mrc_as: AnswerStruct) -> bool:
+        for key, value in mrc_as._asdict().items():
+            if any(value == k for k in ["", " ", None, -1]):
+                return False
+        return True
 
     def __repr__(self):
         raise NotImplementedError
@@ -184,4 +224,9 @@ if __name__ == "__main__":
         "dataset", "GENIAcorpus3.02p", "GENIAcorpus3.02.merged.xml"
     )
     a = GENIA(CORPUS_FILE_PATH)
-    a.parse()
+    built_time = datetime.today().strftime("%Y/%m/%d-%H:%M:%S")
+    version = "GENIAcorpus3.02p"
+    output_file_path = os.path.join(
+        "dataset", "GENIAcorpus3.02p", "mrc_GENIAcorpus3.02p.json"
+    )
+    a.get_mrc_json(built_time, version, output_file_path)

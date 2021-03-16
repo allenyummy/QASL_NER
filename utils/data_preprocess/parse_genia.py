@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.INFO)
 class GENIA:
     def __init__(self, file_path):
         self.file_path = file_path
-        self.root = self.load_and_get_root()
+        self.root = self.load_and_get_root(self.file_path)
 
         self.ARTICLE_KEYWORD = "article"
         self.TITLE_KEYWORD = "title"
@@ -37,11 +37,6 @@ class GENIA:
         self.MULTI_ANS_OR_INDICATOR = "(OR"
 
         self.LABEL_LIST = ["G#DNA", "G#RNA", "G#protein", "G#cell_line", "G#cell_type"]
-
-    def load_and_get_root(self):
-        tree = ET.parse(self.file_path)
-        root = tree.getroot()
-        return root
 
     def get_mrc_json(self, built_time, version, output_file_path):
         data = self.parse()
@@ -162,6 +157,23 @@ class GENIA:
             answers.append(mrc_as)
         mrc_ds = DataStruct(pid, passage, answers)
         return mrc_ds
+
+    @staticmethod
+    def load_and_get_root(file_path: str):
+        """
+        Parse xml file by xml.etree.ElementTree and then get root from tree.
+
+        Args:
+            `file_path`: The XML file path.
+        Type:
+            `file_path`: string
+        Return:
+            `root`: root of xml.etree.ElementTree
+        """
+
+        tree = ET.parse(file_path)
+        root = tree.getroot()
+        return root
 
     @staticmethod
     def lookback(

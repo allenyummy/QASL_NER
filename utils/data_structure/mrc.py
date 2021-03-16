@@ -24,8 +24,8 @@ class AnswerStruct(NamedTuple):
         `end_pos`: integer
     """
 
-    text: str
     type: str
+    text: str
     start_pos: int
     end_pos: int
 
@@ -50,12 +50,12 @@ class DataStruct(NamedTuple):
         `passage`: The passage text of sample.
         `answers`: The answers list of sample.
     Type:
-        `pid`: integer
+        `pid`: string
         `passage`: string
         `answers`: list of `AnswerStruct`
     """
 
-    pid: int
+    pid: str
     passage: str
     answers: List[AnswerStruct]
 
@@ -64,7 +64,7 @@ class DataStruct(NamedTuple):
 
     def __repr__(self):
         message = (
-            f"[  PID  ]: {self.pid},\n" f"[PASSAGE]: {self.passage},\n" f"[ANSWERS]: \n"
+            f"[  PID  ]: {self.pid}\n" f"[PASSAGE]: {self.passage}\n" f"[ANSWERS]: \n"
         )
         for ans in self.answers:
             message += f"{ans}\n"
@@ -96,14 +96,34 @@ class MRCStruct(NamedTuple):
         return f"[BUILT_TIME]: {self.built_time}\n" f"[ VERSION ] : {self.version}"
 
 
+def trans2dict(mrc: MRCStruct):
+
+    data_list = list()
+    data_dict = dict()
+    for data in mrc.data:
+        data_dict["pid"] = data.pid
+        data_dict["passage"] = data.passage
+        data_dict["answers"] = list()
+        for ans in data.answers:
+            ans_dict = dict(ans._asdict())
+            data_dict["answers"].append(ans_dict)
+        data_list.append(data_dict)
+        data_dict = dict()
+
+    mrc_dict = {"built_time": mrc.built_time, "version": mrc.version, "data": data_list}
+    return mrc_dict
+
+
 if __name__ == "__main__":
 
     a_e = AnswerStruct(text="gg", type="ff", start_pos=2, end_pos=4)
     a_s = AnswerStruct(text="gg", type="ff", start_pos=2, end_pos=4)
     a = DataStruct(pid="1", passage="Hello World", answers=[a_e, a_s, a_e])
+    b = MRCStruct(built_time="33", version="V0", data=[a, a, a])
     print(a)
+    print(b)
 
     print(AnswerStruct.__doc__)
 
     print(a_e == a_s)
-    print(a)
+    print(trans2dict(b))

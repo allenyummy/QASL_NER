@@ -105,10 +105,8 @@ class GENIA:
             ans_text = mark.text
             ans_text_list = mark.text.split()
             type = mark.type
-
             pointer = self.lookback(ans_list, type, ans_text, pointer)
-
-            start_pos, end_pos = self.find_start_and_end(
+            start_pos, end_pos = self.find_start_end_position(
                 text_list, ans_text_list, pointer
             )
             mrc_as = AnswerStruct(
@@ -179,25 +177,24 @@ class GENIA:
             prev_ans_type = prev_ans.type
             prev_ans_text = prev_ans.text
 
-            if prev_ans_type == appending_ans_type:
-                if (
-                    appending_ans_text in prev_ans_text
-                    or prev_ans_text in appending_ans_text
-                ):
-                    if prev_ans.start_pos > last_pointer_in_ans:
-                        pointer = prev_ans.start_pos
-                    else:
-                        pointer = last_pointer_in_ans
+            if (
+                appending_ans_type == prev_ans_type
+                and appending_ans_text == prev_ans_text
+            ):
+                if prev_ans.start_pos > last_pointer_in_ans:
+                    pointer = prev_ans.start_pos
+                else:
+                    pointer = last_pointer_in_ans
         return pointer
 
     @staticmethod
-    def find_start_and_end(
+    def find_start_end_position(
         search_space: List[str], sub_space: List[str], index: int
     ) -> Union[int, int]:
         start_pos = -1
         end_pos = -1
-        text = " ".join(search_space).lower()
-        sub_text = " ".join(sub_space).lower()
+        text = " ".join(search_space)
+        sub_text = " ".join(sub_space)
         if index == 0:
             trans_index = 0
         else:

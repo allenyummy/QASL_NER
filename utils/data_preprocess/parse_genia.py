@@ -6,7 +6,7 @@ import logging
 import os
 import sys
 
-sys.path.append(os.getcwd())
+sys.path.append(os.getcwd())  ## add current directory to import package of utils
 import json
 from typing import List, Dict, Union
 from datetime import datetime
@@ -182,6 +182,25 @@ class GENIA:
         appending_ans_text: str,
         pointer: int,
     ) -> int:
+        """
+        Get the right position of pointer by checking the relationship between the answers list and the answer to be inserted.
+        This function is especially used when there are same answer text in different part of the given passage.
+
+        Args:
+            `ans_list`: The answers list that is previously checked well.
+            `appending_ans_type`: The answer type to be inserted.
+            `appending_ans_text`: The answer text to be inserted.
+            `pointer`: The position of pointer.
+        Type:
+            `ans_list`: list of `mrc.AnswerStruct`
+            `appending_ans_type`: string
+            `appending_ans_text`: string
+            `pointer`: integer
+        Return:
+            The right position of pointer.
+            `rtype`: integer
+        """
+
         if ans_list:
             last_pointer_in_ans = ans_list[-1].start_pos
 

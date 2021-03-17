@@ -80,8 +80,14 @@ class GENIA:
         for mark in w.iterfind(self.MARK_XPATH):
             type = mark.get(self.TYPE_KEYWORD)
             if type:
-                type = self.check_and_restore_multi_ans_type(type)
-                text = "".join(mark.itertext())
+                type = self.restore_multi_ans_type(type)
+
+                # By doing the space tokenization,
+                # we can assure answer token is same as that in a given sentence.
+                text = " ".join(mark.itertext())
+                text = text.split()
+                text = " ".join(text)
+
                 mrc_as = AnswerStruct(
                     type=type, text=text, start_pos=None, end_pos=None
                 )

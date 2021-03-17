@@ -236,7 +236,7 @@ class GENIA:
         return start_pos, end_pos
 
     @staticmethod
-    def check_not_empty(mrc_as: AnswerStruct) -> bool:
+    def double_check_ans(mrc_as: AnswerStruct) -> bool:
         for key, value in mrc_as._asdict().items():
             if any(value == k for k in ["", " ", None, -1]):
                 return False

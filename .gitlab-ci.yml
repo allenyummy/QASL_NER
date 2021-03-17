@@ -23,9 +23,8 @@ build:image:
     - if: '$CI_COMMIT_BRANCH == "master"'
       when: never
     - changes:
-      - requirements.txt
-      - Dockerfile
-      when: always
+        - requirements.txt
+        - Dockerfile
     - when: never
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
@@ -64,7 +63,11 @@ release:image:
     - docker:19.03.12-dind
   stage: release
   only:
-    - master
+    refs:
+      - master
+    changes:
+      - requirements.txt
+      - Dockerfile
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - apk update && apk add curl jq

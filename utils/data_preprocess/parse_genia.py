@@ -107,6 +107,7 @@ class GENIA:
             mrc_as = AnswerStruct(
                 type=type, text=ans_text, start_pos=start_pos, end_pos=end_pos
             )
+            assert self.double_check_ans(mrc_as)
             ans_list.append(mrc_as)
         return ans_list
 
@@ -153,7 +154,6 @@ class GENIA:
                 start_pos=ans.start_pos,
                 end_pos=ans.end_pos,
             )
-            assert self.check_not_empty(mrc_as)
             answers.append(mrc_as)
         mrc_ds = DataStruct(pid, passage, answers)
         return mrc_ds

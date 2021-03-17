@@ -71,7 +71,6 @@ class GENIA:
                         logger.info(f"MEDLINE: {medline}")
                         logger.info(f"{category.upper()}: {' '.join(text_list)}")
                         logger.info(f"MARK: {mark_list}")
-                        logger.info(f"ANS: {ans_list}")
                         logger.info(f"MRC_DS: {mrc_ds}")
                         logger.info("------------")
         return data

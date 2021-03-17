@@ -207,20 +207,21 @@ class GENIA:
         """
 
         if ans_list:
-            last_pointer_in_ans = ans_list[-1].start_pos
-
+            pointer = ans_list[-1].start_pos
         for prev_ans in ans_list:
-            prev_ans_type = prev_ans.type
             prev_ans_text = prev_ans.text
-
+            prev_ans_type = prev_ans.type
             if (
-                appending_ans_type == prev_ans_type
-                and appending_ans_text == prev_ans_text
+                appending_ans_text in prev_ans_text
+                or prev_ans_text in appending_ans_text
             ):
-                if prev_ans.start_pos > last_pointer_in_ans:
-                    pointer = prev_ans.start_pos
+                if appending_ans_text == prev_ans_text:
+                    if appending_ans_type != prev_ans_type:
+                        pointer = prev_ans.start_pos
+                    else:
+                        pointer = prev_ans.end_pos
                 else:
-                    pointer = last_pointer_in_ans
+                    pointer = prev_ans.start_pos
         return pointer
 
     @staticmethod

@@ -382,7 +382,7 @@ class GENIA:
         ans_text = " ".join(ans_text_list)
         ans_text_found = " ".join(text_list[start_pos:end_pos])
         if ans_text != ans_text_found:
-            logger.info(
+            logger.debug(
                 f"****** pointer:{pointer} ORIGIN: {ans_text}, BUT FOUND {ans_text_found} {start_pos} {end_pos}\n"
                 f"Mutilple Answers with the same general type, but only one mention in the sentence.\n"
                 f"It may be result of the fact that we prune and transform subtype into general type, or the annotation error."
@@ -390,7 +390,7 @@ class GENIA:
             start_pos, end_pos = GENIA.find_start_end_position(
                 text_list, ans_text_list, pointer=0
             )
-            logger.info(f"pointer:{pointer} ORIGIN: {ans_text} {start_pos} {end_pos}")
+            logger.debug(f"pointer:{pointer} ORIGIN: {ans_text} {start_pos} {end_pos}")
         return start_pos, end_pos
 
     @staticmethod

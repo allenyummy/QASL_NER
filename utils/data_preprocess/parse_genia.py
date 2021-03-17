@@ -151,6 +151,7 @@ class GENIA:
             )
             assert self.double_check_ans(mrc_as)
             ans_list.append(mrc_as)
+        ans_list = sorted(ans_list, key=lambda k: (k.start_pos, k.end_pos, k.type))
         return ans_list
 
     def restore_multi_ans_type(self, type: str) -> str:

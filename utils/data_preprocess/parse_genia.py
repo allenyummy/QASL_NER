@@ -226,19 +226,35 @@ class GENIA:
 
     @staticmethod
     def find_start_end_position(
-        search_space: List[str], sub_space: List[str], index: int
+        text_list: List[str], ans_text_list: List[str], pointer: int
     ) -> Union[int, int]:
         start_pos = -1
         end_pos = -1
-        text = " ".join(search_space)
-        sub_text = " ".join(sub_space)
-        if index == 0:
-            trans_index = 0
-        else:
-            trans_index = len(" ".join(search_space[0:index])) + 1
-        start_pos = text.find(sub_text, trans_index)
-        start_pos = len(text[0:start_pos].split())
-        end_pos = start_pos + len(sub_space)
+        ans_len = len(ans_text_list)
+        while pointer < len(text_list) and end_pos == -1:
+            ans_text = " ".join(ans_text_list)
+            text_candidate = " ".join(text_list[pointer : pointer + ans_len])
+            if ans_text != text_candidate:
+                pointer += 1
+            else:
+                start_pos = pointer
+                end_pos = start_pos + ans_len
+
+        ## check if the answer found is same as the given answer text
+        ## so we re-run this function at the beginning.
+        text = " ".join(text_list)
+        ans_text = " ".join(ans_text_list)
+        ans_text_found = " ".join(text_list[start_pos:end_pos])
+        if ans_text != ans_text_found:
+            logger.info(
+                f"****** pointer:{pointer} ORIGIN: {ans_text}, BUT FOUND {ans_text_found} {start_pos} {end_pos}\n"
+                f"Mutilple Answers with the same general type, but only one mention in the sentence.\n"
+                f"It may be result of the fact that we prune and transform subtype into general type, or the annotation error."
+            )
+            start_pos, end_pos = GENIA.find_start_end_position(
+                text_list, ans_text_list, pointer=0
+            )
+            logger.info(f"pointer:{pointer} ORIGIN: {ans_text} {start_pos} {end_pos}")
         return start_pos, end_pos
 
     @staticmethod

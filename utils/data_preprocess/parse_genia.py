@@ -36,7 +36,19 @@ class GENIA:
         self.MULTI_ANS_AND_INDICATOR = "(AND"
         self.MULTI_ANS_OR_INDICATOR = "(OR"
 
+        # We follow the same strategy of [Finkel and Manning, 2009, Nested Named Entity Recognition].
+
+        # We only keep these five general type.
+        # To be more specific,
+        # we collapsed all DNA subtypes into DNA;
+        # all RNA subtypes into RNA;
+        # all protein sub- types into protein;
+        # kept cell line and cell type;
+        # and removed all other entities.
         self.LABEL_LIST = ["G#DNA", "G#RNA", "G#protein", "G#cell_line", "G#cell_type"]
+
+        # The ratio of splitting dataset is also same as the ratio of paper.
+        self.split_dataset_ratio = [0.81, 0.09, 0.10]
 
     def get_mrc_json(self, built_time, version, output_file_path):
         data = self.parse()

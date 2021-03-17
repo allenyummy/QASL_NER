@@ -146,7 +146,7 @@ class GENIA:
         category: str,
         index: int,
         text_list: List[str],
-        ans_list: List[dict],
+        ans_list: List[AnswerStruct],
     ) -> DataStruct:
 
         pid = f"{medline}-{category}-{index}"

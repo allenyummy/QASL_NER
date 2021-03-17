@@ -12,6 +12,7 @@ from typing import List, Dict, Union
 from datetime import datetime
 import xml.etree.ElementTree as ET
 from utils.data_structure.mrc import AnswerStruct, DataStruct, MRCStruct, trans2dict
+from utils.data_structure.stat import GENIA_StatStruct
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -60,6 +61,34 @@ class GENIA:
             out = json.dumps(mrc_dict, indent=4, ensure_ascii=False)
             fout.write(out)
 
+    def split(self) -> Union[List[DataStruct], List[DataStruct], List[DataStruct]]:
+        return NotImplementedError
+
+    def get_stat(self) -> GENIA_StatStruct:
+        data = self.parse()
+        stat_helper = GENIA_StatStruct()
+        stat_helper.n_sentence = len(data)
+        for d in data:
+            pid = d.pid
+            passage = d.passage
+            stat_helper.n_tokens += len(passage.split())
+            stat_helper.n_entities += len(d.answers)
+
+            for ans in d.answers:
+                key = ans.type
+                if key == self.LABEL_LIST[0]:
+                    stat_helper.n_DNA += 1
+                elif key == self.LABEL_LIST[1]:
+                    stat_helper.n_RNA += 1
+                elif key == self.LABEL_LIST[2]:
+                    stat_helper.n_protein += 1
+                elif key == self.LABEL_LIST[3]:
+                    stat_helper.n_cell_line += 1
+                elif key == self.LABEL_LIST[4]:
+                    stat_helper.n_cell_type += 1
+
+        return stat_helper
+
     def parse(self):
         data = list()
         for i, child in enumerate(self.root.iter(self.ARTICLE_KEYWORD)):
@@ -79,12 +108,12 @@ class GENIA:
                     sentence_idx += 1
                     data.append(mrc_ds)
 
-                    if i < 5:
-                        logger.info(f"MEDLINE: {medline}")
-                        logger.info(f"{category.upper()}: {' '.join(text_list)}")
-                        logger.info(f"MARK: {mark_list}")
-                        logger.info(f"MRC_DS: {mrc_ds}")
-                        logger.info("------------")
+                    if i < 1:
+                        logger.debug(f"MEDLINE: {medline}")
+                        logger.debug(f"{category.upper()}: {' '.join(text_list)}")
+                        logger.debug(f"MARK: {mark_list}")
+                        logger.debug(f"MRC_DS: {mrc_ds}")
+                        logger.debug("------------")
         return data
 
     def get_mark_list(self, w) -> List[AnswerStruct]:
@@ -413,9 +442,6 @@ class GENIA:
                 return False
         return True
 
-    def __repr__(self):
-        raise NotImplementedError
-
 
 if __name__ == "__main__":
 
@@ -428,4 +454,6 @@ if __name__ == "__main__":
     output_file_path = os.path.join(
         "dataset", "GENIAcorpus3.02p", "mrc_GENIAcorpus3.02p.json"
     )
-    a.get_mrc_json(built_time, version, output_file_path)
+    # a.get_mrc_json(built_time, version, output_file_path)
+    b = a.get_stat()
+    print(b)

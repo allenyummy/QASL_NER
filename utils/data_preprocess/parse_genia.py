@@ -76,6 +76,18 @@ class GENIA:
         return data
 
     def get_mark_list(self, w) -> List[AnswerStruct]:
+        """
+        Get original mark from a sentence in a given article.
+
+        Args:
+            `w`: It's a sentence-based child from a given title or abstract of a given article.
+        Type:
+            `w`: Element
+        Return:
+            A marks list of a sentence.
+            rtype: list of `mrc.AnswerStruct`
+        """
+
         mark_list = list()
         for mark in w.iterfind(self.MARK_XPATH):
             type = mark.get(self.TYPE_KEYWORD)
@@ -97,6 +109,19 @@ class GENIA:
     def get_answer_position_from_text(
         self, text_list: List[str], mark_list: List[AnswerStruct]
     ) -> List[AnswerStruct]:
+        """
+        Get start and end position of answer from a sentence.
+
+        Args:
+            `text_list`: A text list of a sentence.
+            `mark_list`: A marks list.
+        Type:
+            `text_list`: list of string
+            `mark_list`: list of `mrc.AnswerStruct`
+        Return:
+            A complete answers list that each answer contains type, text, start_pos, and end_pos.
+            rtype: `mrc.AnswerStruct`
+        """
 
         mark_list_pt = self.prune_unnecessary_marks_and_transform(mark_list)
         ans_list = list()
@@ -116,7 +141,46 @@ class GENIA:
             ans_list.append(mrc_as)
         return ans_list
 
-    def check_and_restore_multi_ans_type(self, type: str) -> str:
+    def restore_multi_ans_type(self, type: str) -> str:
+        """
+        Check and restore a type of multiple answers.
+        Example:
+            0) Single Answer:
+                MEDLINE: MEDLINE:95280913
+                ABSTRACT: In chickens , estrogens stimulate outgrowth of bone marrow-derived erythroid progenitor cells and delay their maturation .
+                MARK: [..., (G#other_name, maturation, None, None)]
+
+                type = G#other_name
+                <-- after this function -->
+                type = G#other_name
+
+            1) Double Answers:
+                MEDLINE: MEDLINE:95280913
+                ABSTRACT: This delay is associated with down-regulation of many erythroid cell-specific genes , including alpha- and beta- globin , band 3 , band 4.1 , and the erythroid cell-specific histone H5 .
+                MARK: [..., ((AND G#DNA_domain_or_region G#DNA_domain_or_region), alpha- and beta-globin, None, None), ...]
+
+                type = (AND G#DNA_domain_or_region G#DNA_domain_or_region)
+                <-- after this function -->
+                type = G#DNA_domain_or_regin
+
+            2) Triple Answers:
+                MEDLINE: MEDLINE:95338146
+                ABSTRACT: Finally , the status of our current knowledge concerning the roles of transcription factors in the commitment to erythroid , myeloid and lymphoid cell types is summarized .
+                MARK: [..., ((AND G#cell_type G#cell_type G#cell_type), erythroid, myeloid and lymphoid cell types, None, None)]
+
+                type = (AND G#cell_type G#cell_type G#cell_type)
+                <-- after this function -->
+                type = G#cell_type
+
+        Args:
+            `type`: An original type of answers.
+        Type:
+            `type`: string
+        Return:
+            A type that is checked and restored.
+            rtype: string
+        """
+
         if any(
             k in type
             for k in [self.MULTI_ANS_AND_INDICATOR, self.MULTI_ANS_OR_INDICATOR]
@@ -127,6 +191,24 @@ class GENIA:
     def prune_unnecessary_marks_and_transform(
         self, mark_list: List[AnswerStruct]
     ) -> List[AnswerStruct]:
+        """
+        Prune unnecessary marks. We only care marks whose types are the subtype of `self.LABEL_LIST`.
+        Once we locate those marks we care, we transform them to a general type of `self.LABEL_LIST`.
+        This function is used in the function of `get_answer_position_from_text`,
+        and we use it before we find the start and end position of an answer in a given sentence.
+
+        Be care for some mentions that appear only once in the sentence but with different sub type of a general type.
+        These mentions could be duplicate answers. Please notice that.
+
+        Args:
+            `mark_list`: A marks list that contain marks in a sentence of a given article.
+                         Note: Both their start_pos and end_pos are still None.
+        Type:
+            `mark_list`: list of `mrc.AnswerStruct`
+        Return:
+            rtype: list of `mrc.AnswerStruct`
+        """
+
         mark_list_pt = list()
         for mark in mark_list:
             for label in self.LABEL_LIST:
@@ -148,6 +230,25 @@ class GENIA:
         text_list: List[str],
         ans_list: List[AnswerStruct],
     ) -> DataStruct:
+        """
+        Format a data sample.
+
+        Args:
+            `medline`: An identification number of an article.
+            `category`: A category of an article. It's either `title` or `abstract`.
+            `index`: An index number of sentence in a given article.
+            `text_list`: A text list of a sentence in a given article.
+            `ans_list`: An answers list of complete answers.
+        Type:
+            `medline`: string
+            `category`: string
+            `index`: integer
+            `text_list`: list of string
+            `ans_list`: list of `mrc.AnswerStruct`
+        Return:
+            A complete data sample.
+            rtype: `mrc.DataStruct`
+        """
 
         pid = f"{medline}-{category}-{index}"
         passage = " ".join(text_list)
@@ -169,7 +270,7 @@ class GENIA:
         Parse xml file by xml.etree.ElementTree and then get root from tree.
 
         Args:
-            `file_path`: The XML file path.
+            `file_path`: A XML file path.
         Type:
             `file_path`: string
         Return:
@@ -188,21 +289,21 @@ class GENIA:
         pointer: int,
     ) -> int:
         """
-        Get the right position of pointer by checking the relationship between the answers list and the answer to be inserted.
-        This function is especially used when there are same answer text in different part of the given passage.
+        Get a right position of pointer by checking the relationship between an answers list and an answer to be inserted.
+        This function is especially used when there are same answer text in different part of a sentence in a given article.
 
         Args:
-            `ans_list`: The answers list that is previously checked well.
-            `appending_ans_type`: The answer type to be inserted.
-            `appending_ans_text`: The answer text to be inserted.
-            `pointer`: The position of pointer.
+            `ans_list`: An answers list that is previously checked well.
+            `appending_ans_type`: An answer type to be inserted.
+            `appending_ans_text`: An answer text to be inserted.
+            `pointer`: A position of pointer.
         Type:
             `ans_list`: list of `mrc.AnswerStruct`
             `appending_ans_type`: string
             `appending_ans_text`: string
             `pointer`: integer
         Return:
-            The right position of pointer.
+            A right position of pointer.
             `rtype`: integer
         """
 
@@ -228,6 +329,28 @@ class GENIA:
     def find_start_end_position(
         text_list: List[str], ans_text_list: List[str], pointer: int
     ) -> Union[int, int]:
+        """
+        Find start and end position of answer from a given sentence of a article.
+        Example:
+            0) Double annotation with same type for a mention that appears only once in a given sentence.
+                MEDLINE: MEDLINE:94338593
+                ABSTRACT: CONCLUSION : The degree of immunodeficiency does not clearly enhance replicative gene expression in tumour cells of ARNHL .
+                MARK: [..., (G#cell_type, tumour cells, None, None), (G#cell_type, tumour cells, None, None), ...]
+            1) ...
+
+        Args:
+            `text_list`: a text list of a sentence.
+            `ans_text_list`: an text list of an answer.
+            `pointer`: a start position to search position of answer.
+        Type:
+            `text_list`: list of string
+            `ans_text_list`: list of string
+            `pointer`: integer
+        Return
+            Both start and end position of an answer.
+            `rtype`: integer, integer
+        """
+
         start_pos = -1
         end_pos = -1
         ans_len = len(ans_text_list)
@@ -259,6 +382,19 @@ class GENIA:
 
     @staticmethod
     def double_check_ans(mrc_as: AnswerStruct) -> bool:
+        """
+        Double check answers.
+        If the value of answers is `""`, `" "`, `None`, or `-1`, return False.
+        Otherwise, return True.
+
+        Args:
+            `mrc_as`: An answer which follows the structure of `mrc.AnswerStruct`.
+        Type:
+            `mrc_as`: `mrc.AnswerStruct`
+        Return:
+            rtype: bool
+        """
+
         for key, value in mrc_as._asdict().items():
             if any(value == k for k in ["", " ", None, -1]):
                 return False

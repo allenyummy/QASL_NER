@@ -49,10 +49,68 @@ class GENIA:
         self.LABEL_LIST = ["G#DNA", "G#RNA", "G#protein", "G#cell_line", "G#cell_type"]
 
         # The ratio of splitting dataset is also same as the ratio of paper.
-        self.split_dataset_ratio = [0.81, 0.09, 0.10]
+        self.TRAIN_DATA_RATIO = 0.81
+        self.DEV_DATA_RATIO = 0.09
+        self.TEST_DATA_RATIO = 0.10
 
-    def get_mrc_json(self, built_time, version, output_file_path):
+    def split(
+        self,
+        train_ratio: float = 0.81,
+        dev_ratio: float = 0.09,
+        test_ratio: float = 0.10,
+    ) -> Union[List[DataStruct], List[DataStruct], List[DataStruct]]:
+        """
+        Split overall data into three data sets that follow the ratio of [0.81, 0.09, 0.10].
+        The ratio is same as the setting of paper [Finkel and Manning, 2009, Nested Named Entity Recognition].
+
+        Args:
+            `train_ratio`: A ratio of train data set to overall data set.
+            `dev_ratio`: A ratio of dev data set to overall data set.
+            `test_ratio`: A ratio of test data set to overall data set.
+        Type:
+            `train_ratio`: float
+            `dev_ratio`: float
+            `test_ratio`: float
+        Return:
+            Three data sets.
+            rtype: list of `mrc.DataStruct`, list of `mrc.DataStruct`, list of `mrc.DataStruct`
+        """
+
+        assert train_ratio + dev_ratio + test_ratio == 1
         data = self.parse()
+        data_len = len(data)
+        train_size = int(data_len * train_ratio)
+        dev_size = int(data_len * dev_ratio)
+        test_size = data_len - train_size - dev_size
+        train_data = data[:train_size]
+        dev_data = data[train_size : train_size + dev_size]
+        test_data = data[train_size + dev_size :]
+        return train_data, dev_data, test_data
+
+    def get_mrc_json(
+        self,
+        built_time: str,
+        version: str,
+        output_file_path: str,
+        data: List[DataStruct],
+    ):
+        """
+        Output json file.
+
+        Args:
+            `built_time`: A time when data set is built.
+            `version`: A version of data set.
+            `output_file_path`: A path of output file.
+            `data`: Data to be outputed.
+        Type:
+            `built_time`: string
+            `version`: string
+            `output_file_path`: string
+            `data`: list of `mrc.DataStruct`
+        Return:
+            A output json file
+        """
+
         mrc = MRCStruct(built_time=built_time, version=version, data=data)
         mrc_dict = trans2dict(mrc)
         logger.info(mrc)
@@ -61,11 +119,19 @@ class GENIA:
             out = json.dumps(mrc_dict, indent=4, ensure_ascii=False)
             fout.write(out)
 
-    def split(self) -> Union[List[DataStruct], List[DataStruct], List[DataStruct]]:
-        return NotImplementedError
+    def get_stat(self, data: List[DataStruct]) -> GENIA_StatStruct:
+        """
+        Get statistic of data.
 
-    def get_stat(self) -> GENIA_StatStruct:
-        data = self.parse()
+        Args:
+            `data`: Data to be analyzed.
+        Type:
+            `data`: list of `mrc.DataStruct`
+        Return:
+            GENIA Stat data.
+            rtype: `stat.GENIA_StatStruct`
+        """
+
         stat_helper = GENIA_StatStruct()
         stat_helper.n_sentence = len(data)
         for d in data:
@@ -73,7 +139,6 @@ class GENIA:
             passage = d.passage
             stat_helper.n_tokens += len(passage.split())
             stat_helper.n_entities += len(d.answers)
-
             for ans in d.answers:
                 key = ans.type
                 if key == self.LABEL_LIST[0]:
@@ -86,10 +151,20 @@ class GENIA:
                     stat_helper.n_cell_line += 1
                 elif key == self.LABEL_LIST[4]:
                     stat_helper.n_cell_type += 1
-
+        stat_helper.calc_average()
         return stat_helper
 
-    def parse(self):
+    def parse(self) -> List[DataStruct]:
+        """
+        Parse overall xml data.
+
+        Args: None
+        Type: None
+        Return:
+            Overall data.
+            rtype: list of `DataStruct`
+        """
+
         data = list()
         for i, child in enumerate(self.root.iter(self.ARTICLE_KEYWORD)):
             medline = child.find(self.MEDLINE_XPATH).text
@@ -455,5 +530,22 @@ if __name__ == "__main__":
         "dataset", "GENIAcorpus3.02p", "mrc_GENIAcorpus3.02p.json"
     )
     # a.get_mrc_json(built_time, version, output_file_path)
-    b = a.get_stat()
-    print(b)
+    data = a.parse()
+    train_data, dev_data, test_data = a.split()
+
+    overall_stat = a.get_stat(data)
+    train_stat = a.get_stat(train_data)
+    dev_stat = a.get_stat(dev_data)
+    test_stat = a.get_stat(test_data)
+
+    print(f"===== OVERALL =====")
+    print(overall_stat)
+    print()
+    print("===== TRAIN =====")
+    print(train_stat)
+    print()
+    print("===== DEV =====")
+    print(dev_stat)
+    print()
+    print("===== TEST =====")
+    print(test_stat)

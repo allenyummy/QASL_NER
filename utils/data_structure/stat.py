@@ -34,6 +34,9 @@ class GENIA_StatStruct:
     n_token_per_sentence: float = 0.0
     n_entity_per_sentence: float = 0.0
 
+    def calculate(self):
+        raise NotImplementedError
+
     def calc_average(self):
         if self.n_sentence != 0:
             self.n_token_per_sentence = round(self.n_token / self.n_sentence, 2)

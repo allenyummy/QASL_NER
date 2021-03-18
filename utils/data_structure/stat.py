@@ -22,6 +22,11 @@ class GENIA_StatStruct:
     n_tokens_per_sentence: float = 0.0
     n_entities_per_sentence: float = 0.0
 
+    def calc_average(self):
+        if self.n_sentence != 0:
+            self.n_tokens_per_sentence = round(self.n_tokens / self.n_sentence, 2)
+            self.n_entities_per_sentence = round(self.n_entities / self.n_sentence, 2)
+
     def __repr__(self):
         return (
             f"Total number of sentence:      {self.n_sentence}\n"
@@ -29,7 +34,6 @@ class GENIA_StatStruct:
             f"Total number of entities:      {self.n_entities}\n"
             f"Average tokens per sentence:   {self.n_tokens_per_sentence}\n"
             f"Average entities per sentence: {self.n_entities_per_sentence}\n"
-            f"--- \n"
             f"Total number of entities of DNA:       {self.n_DNA}\n"
             f"Total number of entities of RNA:       {self.n_RNA}\n"
             f"Total number of entities of protein:   {self.n_protein}\n"

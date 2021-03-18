@@ -137,8 +137,8 @@ class GENIA:
         for d in data:
             pid = d.pid
             passage = d.passage
-            stat_helper.n_tokens += len(passage.split())
-            stat_helper.n_entities += len(d.answers)
+            stat_helper.n_token += len(passage.split())
+            stat_helper.n_entity += len(d.answers)
             for ans in d.answers:
                 key = ans.type
                 if key == self.LABEL_LIST[0]:

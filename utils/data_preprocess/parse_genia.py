@@ -12,7 +12,7 @@ from typing import List, Dict, Union
 from datetime import datetime
 import xml.etree.ElementTree as ET
 from utils.data_structure.mrc import AnswerStruct, DataStruct, MRCStruct, trans2dict
-from utils.data_structure.stat import GENIA_StatStruct
+from utils.data_structure.stat import StatStruct
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -46,7 +46,7 @@ class GENIA:
         # all protein sub- types into protein;
         # kept cell line and cell type;
         # and removed all other entities.
-        self.LABEL_LIST = ["G#DNA", "G#RNA", "G#protein", "G#cell_line", "G#cell_type"]
+        self.TYPE_LIST = ["G#DNA", "G#RNA", "G#protein", "G#cell_line", "G#cell_type"]
 
         # The ratio of splitting dataset is also same as the ratio of paper.
         self.TRAIN_DATA_RATIO = 0.81
@@ -119,7 +119,7 @@ class GENIA:
             out = json.dumps(mrc_dict, indent=4, ensure_ascii=False)
             fout.write(out)
 
-    def get_stat(self, data: List[DataStruct]) -> GENIA_StatStruct:
+    def get_stat(self, data: List[DataStruct]) -> StatStruct:
         """
         Get statistic of data.
 
@@ -132,27 +132,48 @@ class GENIA:
             rtype: `stat.GENIA_StatStruct`
         """
 
-        stat_helper = GENIA_StatStruct()
+        stat_helper = StatStruct(self.TYPE_LIST)
+        print("!!!!!!!")
+        logger.info(f"{stat_helper}")
         stat_helper.n_sentence = len(data)
         for d in data:
-            pid = d.pid
-            passage = d.passage
-            stat_helper.n_token += len(passage.split())
-            stat_helper.n_entity += len(d.answers)
-            for ans in d.answers:
-                key = ans.type
-                if key == self.LABEL_LIST[0]:
-                    stat_helper.n_DNA += 1
-                elif key == self.LABEL_LIST[1]:
-                    stat_helper.n_RNA += 1
-                elif key == self.LABEL_LIST[2]:
-                    stat_helper.n_protein += 1
-                elif key == self.LABEL_LIST[3]:
-                    stat_helper.n_cell_line += 1
-                elif key == self.LABEL_LIST[4]:
-                    stat_helper.n_cell_type += 1
+            stat_helper = self.calc_per_data(d, stat_helper)
+        for type in self.TYPE_LIST:
+            assert stat_helper.each_type_stat[type].n_entity == sum(
+                stat_helper.each_type_stat[type].layer
+            )
         stat_helper.calc_average()
         return stat_helper
+
+    @staticmethod
+    def calc_per_data(data: DataStruct, stat_helper: StatStruct):
+        tmp = stat_helper
+        pid = data.pid
+        passage = data.passage
+        passage_tokens = passage.split()
+        answers = data.answers
+
+        tmp.n_token += len(passage_tokens)
+        tmp.n_entity += len(answers)
+
+        answers = sorted(answers, key=lambda k: (k.start_pos, -k.end_pos, k.type))
+        seq = [0] * len(passage_tokens)
+
+        for ans in answers:
+            seq = [
+                k + 1 if i >= ans.start_pos and i < ans.end_pos else k
+                for i, k in enumerate(seq)
+            ]
+            depth_now = len(tmp.each_type_stat[ans.type].layer)
+            distance = max(seq) - depth_now
+            if distance > 0:
+                tmp.each_type_stat[ans.type].layer = (
+                    tmp.each_type_stat[ans.type].layer.copy() + [0] * distance
+                )
+            tmp.each_type_stat[ans.type].n_entity += 1
+            depth = seq[ans.start_pos]
+            tmp.each_type_stat[ans.type].layer[depth - 1] += 1
+        return tmp
 
     def parse(self) -> List[DataStruct]:
         """
@@ -309,8 +330,8 @@ class GENIA:
         self, mark_list: List[AnswerStruct]
     ) -> List[AnswerStruct]:
         """
-        Prune unnecessary marks. We only care marks whose types are the subtype of `self.LABEL_LIST`.
-        Once we locate those marks we care, we transform them to a general type of `self.LABEL_LIST`.
+        Prune unnecessary marks. We only care marks whose types are the subtype of `self.TYPE_LIST`.
+        Once we locate those marks we care, we transform them to a general type of `self.TYPE_LIST`.
         This function is used in the function of `get_answer_position_from_text`,
         and we use it before we find the start and end position of an answer in a given sentence.
 
@@ -328,10 +349,10 @@ class GENIA:
 
         mark_list_pt = list()
         for mark in mark_list:
-            for label in self.LABEL_LIST:
-                if label in mark.type:
+            for type in self.TYPE_LIST:
+                if type in mark.type:
                     mrc_as = AnswerStruct(
-                        type=label,
+                        type=type,
                         text=mark.text,
                         start_pos=mark.start_pos,
                         end_pos=mark.end_pos,
@@ -536,7 +557,7 @@ if __name__ == "__main__":
     overall_stat = a.get_stat(data)
     train_stat = a.get_stat(train_data)
     dev_stat = a.get_stat(dev_data)
-    test_stat = a.get_stat(test_data)
+    # test_stat = a.get_stat(test_data)
 
     print(f"===== OVERALL =====")
     print(overall_stat)
@@ -548,4 +569,4 @@ if __name__ == "__main__":
     print(dev_stat)
     print()
     print("===== TEST =====")
-    print(test_stat)
+    # print(test_stat)

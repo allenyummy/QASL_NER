@@ -1,6 +1,7 @@
 # encoding=utf-8
 # Author: Yu-Lun Chiang
 # Description: Parse GENIAcorpus3.02p
+# **Trouble** depth=2 G#RNA MEDLINE:96379940-abstract-11
 
 import logging
 import os
@@ -202,8 +203,8 @@ class GENIA:
                     mrc_ds = self.format(
                         medline, category, sentence_idx, text_list, ans_list
                     )
-                    sentence_idx += 1
                     data.append(mrc_ds)
+                    sentence_idx += 1
 
                     if i < 1:
                         logger.debug(f"MEDLINE: {medline}")
@@ -549,14 +550,14 @@ if __name__ == "__main__":
     output_file_path = os.path.join(
         "dataset", "GENIAcorpus3.02p", "mrc_GENIAcorpus3.02p.json"
     )
-    # a.get_mrc_json(built_time, version, output_file_path)
     data = a.parse()
-    train_data, dev_data, test_data = a.split()
+    a.get_mrc_json(built_time, version, output_file_path, data)
 
+    train_data, dev_data, test_data = a.split()
     overall_stat = a.get_stat(data)
     train_stat = a.get_stat(train_data)
     dev_stat = a.get_stat(dev_data)
-    # test_stat = a.get_stat(test_data)
+    test_stat = a.get_stat(test_data)
 
     print(f"===== OVERALL =====")
     print(overall_stat)
@@ -568,4 +569,4 @@ if __name__ == "__main__":
     print(dev_stat)
     print()
     print("===== TEST =====")
-    # print(test_stat)
+    print(test_stat)

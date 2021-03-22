@@ -447,21 +447,19 @@ class GENIA:
         """
 
         if ans_list:
-            pointer = ans_list[-1].start_pos
-        for prev_ans in ans_list:
-            prev_ans_text = prev_ans.text
-            prev_ans_type = prev_ans.type
-            if (
-                appending_ans_text in prev_ans_text
-                or prev_ans_text in appending_ans_text
-            ):
-                if appending_ans_text == prev_ans_text:
-                    if appending_ans_type != prev_ans_type:
-                        pointer = prev_ans.start_pos
+            pointer = ans_list[-1].end_pos
+            last_two_ans = ans_list[-2:]
+            for prev_ans in last_two_ans:
+                prev_ans_text = prev_ans.text
+                prev_ans_type = prev_ans.type
+                if appending_ans_text in prev_ans_text:
+                    if appending_ans_text == prev_ans_text:
+                        if appending_ans_type != prev_ans_type:
+                            pointer = prev_ans.start_pos
+                        else:
+                            pointer = prev_ans.end_pos
                     else:
-                        pointer = prev_ans.end_pos
-                else:
-                    pointer = prev_ans.start_pos
+                        pointer = prev_ans.start_pos
         return pointer
 
     @staticmethod

@@ -8,6 +8,7 @@ import sys
 
 sys.path.append(os.getcwd())  ## add current directory to import package of utils
 import json
+import copy
 from typing import List, Dict, Union
 from datetime import datetime
 import xml.etree.ElementTree as ET
@@ -133,47 +134,47 @@ class GENIA:
         """
 
         stat_helper = StatStruct(self.TYPE_LIST)
-        print("!!!!!!!")
-        logger.info(f"{stat_helper}")
-        stat_helper.n_sentence = len(data)
         for d in data:
             stat_helper = self.calc_per_data(d, stat_helper)
         for type in self.TYPE_LIST:
-            assert stat_helper.each_type_stat[type].n_entity == sum(
-                stat_helper.each_type_stat[type].layer
-            )
+            n_entity = stat_helper.each_type_stat[type].n_entity
+            n_sum = sum(stat_helper.each_type_stat[type].layer)
+            assert n_entity == n_sum
         stat_helper.calc_average()
         return stat_helper
 
     @staticmethod
     def calc_per_data(data: DataStruct, stat_helper: StatStruct):
-        tmp = stat_helper
         pid = data.pid
         passage = data.passage
         passage_tokens = passage.split()
         answers = data.answers
 
-        tmp.n_token += len(passage_tokens)
-        tmp.n_entity += len(answers)
+        stat_helper.n_sentence += 1
+        stat_helper.n_token += len(passage_tokens)
+        stat_helper.n_entity += len(answers)
+        each_type_stat = copy.deepcopy(stat_helper.each_type_stat)
 
         answers = sorted(answers, key=lambda k: (k.start_pos, -k.end_pos, k.type))
         seq = [0] * len(passage_tokens)
-
         for ans in answers:
+            each_type_stat[ans.type].n_entity += 1
+
             seq = [
                 k + 1 if i >= ans.start_pos and i < ans.end_pos else k
                 for i, k in enumerate(seq)
             ]
-            depth_now = len(tmp.each_type_stat[ans.type].layer)
+            depth_now = len(each_type_stat[ans.type].layer)
             distance = max(seq) - depth_now
             if distance > 0:
-                tmp.each_type_stat[ans.type].layer = (
-                    tmp.each_type_stat[ans.type].layer.copy() + [0] * distance
+                each_type_stat[ans.type].layer = (
+                    each_type_stat[ans.type].layer.copy() + [0] * distance
                 )
-            tmp.each_type_stat[ans.type].n_entity += 1
             depth = seq[ans.start_pos]
-            tmp.each_type_stat[ans.type].layer[depth - 1] += 1
-        return tmp
+            each_type_stat[ans.type].layer[depth - 1] += 1
+
+        stat_helper.each_type_stat = each_type_stat
+        return stat_helper
 
     def parse(self) -> List[DataStruct]:
         """

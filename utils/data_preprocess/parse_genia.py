@@ -24,7 +24,7 @@ logging.basicConfig(level=logging.INFO)
 class GENIA(MRC_Preprocessing):
     def __init__(self, file_path):
         self.file_path = file_path
-        self.root = self.load_and_get_root(self.file_path)
+        self.root = self.__init__load_and_get_root(self.file_path)
 
         self.ARTICLE_KEYWORD = "article"
         self.TITLE_KEYWORD = "title"
@@ -56,12 +56,46 @@ class GENIA(MRC_Preprocessing):
         self.DEV_DATA_RATIO = 0.09
         self.TEST_DATA_RATIO = 0.10
 
-    def split(
-        self,
-        train_ratio: float = 0.81,
-        dev_ratio: float = 0.09,
-        test_ratio: float = 0.10,
-    ) -> Union[List[DataStruct], List[DataStruct], List[DataStruct]]:
+    def parse2mrc(self) -> List[DataStruct]:
+        """
+        Parse overall xml data.
+
+        Args: None
+        Type: None
+        Return:
+            Overall data.
+            rtype: list of `DataStruct`
+        """
+
+        data = list()
+        for i, child in enumerate(self.root.iter(self.ARTICLE_KEYWORD)):
+            medline = child.find(self.MEDLINE_XPATH).text
+            sentence_idx = 0
+            for category, xpath in zip(
+                [self.TITLE_KEYWORD, self.ABSTRACT_KEYWORD],
+                [self.TITLE_XPATH, self.ABSTRACT_XPATH],
+            ):
+                for w in child.iterfind(xpath):
+                    text_list = " ".join(w.itertext()).split()
+                    mark_list = self.__parse2mrc__get_mark_list(w)
+                    ans_list = self.__parse2mrc__get_answer_position_from_text(
+                        text_list, mark_list
+                    )
+                    mrc_ds = self.__parse2mrc__format(
+                        medline, category, sentence_idx, text_list, ans_list
+                    )
+                    data.append(mrc_ds)
+                    sentence_idx += 1
+
+                    if i < 1:
+                        logger.debug(f"MEDLINE: {medline}")
+                        logger.debug(f"{category.upper()}: {' '.join(text_list)}")
+                        logger.debug(f"MARK: {mark_list}")
+                        logger.debug(f"MRC_DS: {mrc_ds}")
+                        logger.debug("------------")
+        return data
+
+    def split(self) -> Union[List[DataStruct], List[DataStruct], List[DataStruct]]:
         """
         Split overall data into three data sets that follow the ratio of [0.81, 0.09, 0.10].
         The ratio is same as the setting of paper [Finkel and Manning, 2009, Nested Named Entity Recognition].
@@ -79,19 +113,42 @@ class GENIA(MRC_Preprocessing):
             rtype: list of `mrc.DataStruct`, list of `mrc.DataStruct`, list of `mrc.DataStruct`
         """
 
-        assert train_ratio + dev_ratio + test_ratio == 1
-        data = self.parse()
+        assert self.TRAIN_DATA_RATIO + self.DEV_DATA_RATIO + self.TEST_DATA_RATIO == 1
+        data = self.parse2mrc()
         data_len = len(data)
-        train_size = int(data_len * train_ratio)
-        dev_size = int(data_len * dev_ratio)
+        train_size = int(data_len * self.TRAIN_DATA_RATIO)
+        dev_size = int(data_len * self.DEV_DATA_RATIO)
         test_size = data_len - train_size - dev_size
         train_data = data[:train_size]
         dev_data = data[train_size : train_size + dev_size]
         test_data = data[train_size + dev_size :]
         return train_data, dev_data, test_data
 
-    def get_mrc_json(
-        self,
+    def getStat(self, data: List[DataStruct]) -> StatStruct:
+        """
+        Get statistic of data.
+
+        Args:
+            `data`: Data to be analyzed.
+        Type:
+            `data`: list of `mrc.DataStruct`
+        Return:
+            GENIA Stat data.
+            rtype: `stat.GENIA_StatStruct`
+        """
+
+        stat_helper = StatStruct(self.TYPE_LIST)
+        for d in data:
+            stat_helper = self.__getStat__calc_per_example(d, stat_helper)
+        for type in self.TYPE_LIST:
+            n_entity = stat_helper.each_type_stat[type].n_entity
+            n_sum = sum(stat_helper.each_type_stat[type].layer)
+            assert n_entity == n_sum
+        stat_helper.calc_average()
+        return stat_helper
+
+    @staticmethod
+    def save2json(
         built_time: str,
         version: str,
         output_file_path: str,
@@ -114,108 +171,35 @@ class GENIA(MRC_Preprocessing):
             A output json file
         """
 
+        dir = os.path.abspath(os.path.dirname(output_file_path))
+        if not os.path.exists(dir):
+            os.makedirs(dir)
         mrc = MRCStruct(built_time=built_time, version=version, data=data)
         mrc_dict = trans2dict(mrc)
         logger.info(mrc)
-        logger.info(f"SIZE: {len(mrc)}")
         with open(output_file_path, "w", encoding="utf-8") as fout:
             out = json.dumps(mrc_dict, indent=4, ensure_ascii=False)
             fout.write(out)
-
-    def get_stat(self, data: List[DataStruct]) -> StatStruct:
-        """
-        Get statistic of data.
-
-        Args:
-            `data`: Data to be analyzed.
-        Type:
-            `data`: list of `mrc.DataStruct`
-        Return:
-            GENIA Stat data.
-            rtype: `stat.GENIA_StatStruct`
-        """
-
-        stat_helper = StatStruct(self.TYPE_LIST)
-        for d in data:
-            stat_helper = self.calc_per_data(d, stat_helper)
-        for type in self.TYPE_LIST:
-            n_entity = stat_helper.each_type_stat[type].n_entity
-            n_sum = sum(stat_helper.each_type_stat[type].layer)
-            assert n_entity == n_sum
-        stat_helper.calc_average()
-        return stat_helper
+        logger.info(f"ALREADY SAVE PARSED DATA INTO {output_file_path}.")
 
     @staticmethod
-    def calc_per_data(data: DataStruct, stat_helper: StatStruct):
-        pid = data.pid
-        passage = data.passage
-        passage_tokens = passage.split()
-        answers = data.answers
-
-        stat_helper.n_sentence += 1
-        stat_helper.n_token += len(passage_tokens)
-        stat_helper.n_entity += len(answers)
-        each_type_stat = copy.deepcopy(stat_helper.each_type_stat)
-
-        answers = sorted(answers, key=lambda k: (k.start_pos, -k.end_pos, k.type))
-        seq = [0] * len(passage_tokens)
-        for ans in answers:
-            each_type_stat[ans.type].n_entity += 1
-
-            seq = [
-                k + 1 if i >= ans.start_pos and i < ans.end_pos else k
-                for i, k in enumerate(seq)
-            ]
-            depth_now = len(each_type_stat[ans.type].layer)
-            distance = max(seq) - depth_now
-            if distance > 0:
-                each_type_stat[ans.type].layer = (
-                    each_type_stat[ans.type].layer.copy() + [0] * distance
-                )
-            depth = seq[ans.start_pos]
-            each_type_stat[ans.type].layer[depth - 1] += 1
-
-        stat_helper.each_type_stat = each_type_stat
-        return stat_helper
-
-    def parse(self) -> List[DataStruct]:
+    def __init__load_and_get_root(file_path: str):
         """
-        Parse overall xml data.
+        Parse xml file by xml.etree.ElementTree and then get root from tree.
 
-        Args: None
-        Type: None
+        Args:
+            `file_path`: A XML file path.
+        Type:
+            `file_path`: string
         Return:
-            Overall data.
-            rtype: list of `DataStruct`
+            `root`: root of xml.etree.ElementTree
         """
 
-        data = list()
-        for i, child in enumerate(self.root.iter(self.ARTICLE_KEYWORD)):
-            medline = child.find(self.MEDLINE_XPATH).text
-            sentence_idx = 0
-            for category, xpath in zip(
-                [self.TITLE_KEYWORD, self.ABSTRACT_KEYWORD],
-                [self.TITLE_XPATH, self.ABSTRACT_XPATH],
-            ):
-                for w in child.iterfind(xpath):
-                    text_list = " ".join(w.itertext()).split()
-                    mark_list = self.get_mark_list(w)
-                    ans_list = self.get_answer_position_from_text(text_list, mark_list)
-                    mrc_ds = self.format(
-                        medline, category, sentence_idx, text_list, ans_list
-                    )
-                    data.append(mrc_ds)
-                    sentence_idx += 1
+        tree = ET.parse(file_path)
+        root = tree.getroot()
+        return root
 
-                    if i < 1:
-                        logger.debug(f"MEDLINE: {medline}")
-                        logger.debug(f"{category.upper()}: {' '.join(text_list)}")
-                        logger.debug(f"MARK: {mark_list}")
-                        logger.debug(f"MRC_DS: {mrc_ds}")
-                        logger.debug("------------")
-        return data
-
-    def get_mark_list(self, w) -> List[AnswerStruct]:
+    def __parse2mrc__get_mark_list(self, w) -> List[AnswerStruct]:
         """
         Get original mark from a sentence in a given article.
 
@@ -232,7 +216,7 @@ class GENIA(MRC_Preprocessing):
         for mark in w.iterfind(self.MARK_XPATH):
             type = mark.get(self.TYPE_KEYWORD)
             if type:
-                type = self.restore_multi_ans_type(type)
+                type = self.__parse2mrc__restore_multi_ans_type(type)
 
                 # By doing the space tokenization,
                 # we can assure answer token is same as that in a given sentence.
@@ -246,7 +230,7 @@ class GENIA(MRC_Preprocessing):
                 mark_list.append(mrc_as)
         return mark_list
 
-    def get_answer_position_from_text(
+    def __parse2mrc__get_answer_position_from_text(
         self, text_list: List[str], mark_list: List[AnswerStruct]
     ) -> List[AnswerStruct]:
         """
@@ -263,26 +247,28 @@ class GENIA(MRC_Preprocessing):
             rtype: `mrc.AnswerStruct`
         """
 
-        mark_list_pt = self.prune_unnecessary_marks_and_transform(mark_list)
+        mark_list_pt = self.__parse2mrc__prune_unnecessary_marks_and_transform(
+            mark_list
+        )
         ans_list = list()
         pointer = 0
         for mark in mark_list_pt:
             ans_text = mark.text
             ans_text_list = mark.text.split()
             type = mark.type
-            pointer = self.lookback(ans_list, type, ans_text, pointer)
-            start_pos, end_pos = self.find_start_end_position(
+            pointer = self.__parse2mrc__lookback(ans_list, type, ans_text, pointer)
+            start_pos, end_pos = self.__parse2mrc__find_start_end_position(
                 text_list, ans_text_list, pointer
             )
             mrc_as = AnswerStruct(
                 type=type, text=ans_text, start_pos=start_pos, end_pos=end_pos
             )
-            assert self.double_check_ans(mrc_as)
+            assert self.__parse2mrc__double_check_ans(mrc_as)
             ans_list.append(mrc_as)
         ans_list = sorted(ans_list, key=lambda k: (k.start_pos, k.end_pos, k.type))
         return ans_list
 
-    def restore_multi_ans_type(self, type: str) -> str:
+    def __parse2mrc__restore_multi_ans_type(self, type: str) -> str:
         """
         Check and restore a type of multiple answers.
         Example:
@@ -329,13 +315,13 @@ class GENIA(MRC_Preprocessing):
             type = type.split()[1]
         return type
 
-    def prune_unnecessary_marks_and_transform(
+    def __parse2mrc__prune_unnecessary_marks_and_transform(
         self, mark_list: List[AnswerStruct]
     ) -> List[AnswerStruct]:
         """
         Prune unnecessary marks. We only care marks whose types are the subtype of `self.TYPE_LIST`.
         Once we locate those marks we care, we transform them to a general type of `self.TYPE_LIST`.
-        This function is used in the function of `get_answer_position_from_text`,
+        This function is used in the function of `__parse2mrc__get_answer_position_from_text`,
         and we use it before we find the start and end position of an answer in a given sentence.
 
         Be care for some mentions that appear only once in the sentence but with different sub type of a general type.
@@ -363,7 +349,7 @@ class GENIA(MRC_Preprocessing):
                     mark_list_pt.append(mrc_as)
         return mark_list_pt
 
-    def format(
+    def __parse2mrc__format(
         self,
         medline: str,
         category: str,
@@ -406,24 +392,7 @@ class GENIA(MRC_Preprocessing):
         return mrc_ds
 
     @staticmethod
-    def load_and_get_root(file_path: str):
-        """
-        Parse xml file by xml.etree.ElementTree and then get root from tree.
-
-        Args:
-            `file_path`: A XML file path.
-        Type:
-            `file_path`: string
-        Return:
-            `root`: root of xml.etree.ElementTree
-        """
-
-        tree = ET.parse(file_path)
-        root = tree.getroot()
-        return root
-
-    @staticmethod
-    def lookback(
+    def __parse2mrc__lookback(
         ans_list: List[AnswerStruct],
         appending_ans_type: str,
         appending_ans_text: str,
@@ -465,7 +434,7 @@ class GENIA(MRC_Preprocessing):
         return pointer
 
     @staticmethod
-    def find_start_end_position(
+    def __parse2mrc__find_start_end_position(
         text_list: List[str], ans_text_list: List[str], pointer: int
     ) -> Union[int, int]:
         """
@@ -513,14 +482,14 @@ class GENIA(MRC_Preprocessing):
                 f"Mutilple Answers with the same general type, but only one mention in the sentence.\n"
                 f"It may be result of the fact that we prune and transform subtype into general type, or the annotation error."
             )
-            start_pos, end_pos = GENIA.find_start_end_position(
+            start_pos, end_pos = GENIA.__parse2mrc__find_start_end_position(
                 text_list, ans_text_list, pointer=0
             )
             logger.debug(f"pointer:{pointer} ORIGIN: {ans_text} {start_pos} {end_pos}")
         return start_pos, end_pos
 
     @staticmethod
-    def double_check_ans(mrc_as: AnswerStruct) -> bool:
+    def __parse2mrc__double_check_ans(mrc_as: AnswerStruct) -> bool:
         """
         Double check answers.
         If the value of answers is `""`, `" "`, `None`, or `-1`, return False.
@@ -539,35 +508,113 @@ class GENIA(MRC_Preprocessing):
                 return False
         return True
 
+    @staticmethod
+    def __getStat__calc_per_example(
+        example: DataStruct, stat_helper: StatStruct
+    ) -> StatStruct:
+        """
+        Get stat for each example in data.
+
+        Args:
+            `example`: An example in data.
+            `stat_helper`: A stat helper to keep recording.
+        Type:
+            `example`: `mrc.DataStruct`
+            `stat_helper`: `stat.StatStruct`
+        Return:
+            A stat helper that have already recorded the information of the example.
+            rtype: `stat.StatStruct`
+        """
+
+        pid = example.pid
+        passage = example.passage
+        passage_tokens = passage.split()
+        answers = example.answers
+
+        stat_helper.n_passage += 1
+        stat_helper.n_token += len(passage_tokens)
+        stat_helper.n_entity += len(answers)
+        each_type_stat = copy.deepcopy(stat_helper.each_type_stat)
+
+        answers = sorted(answers, key=lambda k: (k.start_pos, -k.end_pos, k.type))
+        seq = [0] * len(passage_tokens)
+        for ans in answers:
+            each_type_stat[ans.type].n_entity += 1
+
+            seq = [
+                k + 1 if i >= ans.start_pos and i < ans.end_pos else k
+                for i, k in enumerate(seq)
+            ]
+            depth_now = len(each_type_stat[ans.type].layer)
+            distance = max(seq) - depth_now
+            if distance > 0:
+                each_type_stat[ans.type].layer = (
+                    each_type_stat[ans.type].layer.copy() + [0] * distance
+                )
+            depth = seq[ans.start_pos]
+            each_type_stat[ans.type].layer[depth - 1] += 1
+
+        stat_helper.each_type_stat = each_type_stat
+        return stat_helper
+
 
 if __name__ == "__main__":
 
+    logger.info("###### PIPELINE 0: INSTANTIATION ######")
     CORPUS_FILE_PATH = os.path.join(
         "dataset", "GENIAcorpus3.02p", "GENIAcorpus3.02.merged.xml"
     )
-    a = GENIA(CORPUS_FILE_PATH)
+    genia_mrc_preprocessing = GENIA(CORPUS_FILE_PATH)
+    logger.info("-----\n")
+
+    logger.info("###### PIPELINE 1: GET STAT OF OVERALL DATASET ######")
+    data = genia_mrc_preprocessing.parse2mrc()
+    overall_stat = genia_mrc_preprocessing.getStat(data)
+    logger.info(overall_stat)
+    logger.info("-----\n")
+
+    logger.info("###### PIPELINE 2: SAVE PARSED DATA OF OVERALL DATASET ######")
+    data = genia_mrc_preprocessing.parse2mrc()
     built_time = datetime.today().strftime("%Y/%m/%d-%H:%M:%S")
     version = "GENIAcorpus3.02p"
     output_file_path = os.path.join(
-        "dataset", "GENIAcorpus3.02p", "mrc_GENIAcorpus3.02p.json"
+        "dataset", "GENIAcorpus3.02p", "mrc", "all_GENIAcorpus3.02p.json"
     )
-    data = a.parse()
-    a.get_mrc_json(built_time, version, output_file_path, data)
+    genia_mrc_preprocessing.save2json(built_time, version, output_file_path, data)
+    logger.info("-----\n")
 
-    train_data, dev_data, test_data = a.split()
-    overall_stat = a.get_stat(data)
-    train_stat = a.get_stat(train_data)
-    dev_stat = a.get_stat(dev_data)
-    test_stat = a.get_stat(test_data)
+    logger.info("###### PIPELINE 3: SPLIT DATA AND GET STAT OF EACH DATA ######")
+    train_data, dev_data, test_data = genia_mrc_preprocessing.split()
+    train_stat = genia_mrc_preprocessing.getStat(train_data)
+    dev_stat = genia_mrc_preprocessing.getStat(dev_data)
+    test_stat = genia_mrc_preprocessing.getStat(test_data)
+    logger.info("===== TRAIN DATA =====")
+    logger.info(train_stat)
+    logger.info("===== DEV DATA =====")
+    logger.info(dev_stat)
+    logger.info("===== TEST DATA =====")
+    logger.info(test_stat)
+    logger.info("-----\n")
 
-    print(f"===== OVERALL =====")
-    print(overall_stat)
-    print()
-    print("===== TRAIN =====")
-    print(train_stat)
-    print()
-    print("===== DEV =====")
-    print(dev_stat)
-    print()
-    print("===== TEST =====")
-    print(test_stat)
+    logger.info("###### PIPELINE 4: SAVE SPLIT DATA ######")
+    train_data, dev_data, test_data = genia_mrc_preprocessing.split()
+    built_time = datetime.today().strftime("%Y/%m/%d-%H:%M:%S")
+    version = "GENIAcorpus3.02p"
+    train_output_file_path = os.path.join(
+        "dataset", "GENIAcorpus3.02p", "mrc", "train_mrc_GENIAcorpus3.02p.json"
+    )
+    dev_output_file_path = os.path.join(
+        "dataset", "GENIAcorpus3.02p", "mrc", "dev_mrc_GENIAcorpus3.02p.json"
+    )
+    test_output_file_path = os.path.join(
+        "dataset", "GENIAcorpus3.02p", "mrc", "test_mrc_GENIAcorpus3.02p.json"
+    )
+    genia_mrc_preprocessing.save2json(
+        built_time, version, train_output_file_path, train_data
+    )
+    genia_mrc_preprocessing.save2json(
+        built_time, version, dev_output_file_path, dev_data
+    )
+    genia_mrc_preprocessing.save2json(
+        built_time, version, test_output_file_path, test_data
+    )

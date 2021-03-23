@@ -13,6 +13,7 @@ import copy
 from typing import List, Dict, Union
 from datetime import datetime
 import xml.etree.ElementTree as ET
+from utils.data_preprocess.base import MRC_Preprocessing
 from utils.data_structure.mrc import AnswerStruct, DataStruct, MRCStruct, trans2dict
 from utils.data_structure.stat import StatStruct
 
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
-class GENIA:
+class GENIA(MRC_Preprocessing):
     def __init__(self, file_path):
         self.file_path = file_path
         self.root = self.load_and_get_root(self.file_path)

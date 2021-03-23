@@ -93,7 +93,11 @@ class MRCStruct(NamedTuple):
         return len(self.data)
 
     def __repr__(self):
-        return f"[BUILT_TIME]: {self.built_time}\n" f"[ VERSION ] : {self.version}"
+        return (
+            f"[BUILT_TIME]: {self.built_time}\n"
+            f"[  VERSION ]: {self.version}\n"
+            f"[   SIZE   ]: {len(self.data)}"
+        )
 
 
 def trans2dict(mrc: MRCStruct):

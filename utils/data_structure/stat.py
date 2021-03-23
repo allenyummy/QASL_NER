@@ -28,11 +28,11 @@ class TypeStatStruct:
 
 
 class StatStruct:
-    n_sentence: int = 0
+    n_passage: int = 0
     n_token: int = 0
     n_entity: int = 0
-    n_token_per_sentence: float = 0.0
-    n_entity_per_sentence: float = 0.0
+    n_token_per_passage: float = 0.0
+    n_entity_per_passage: float = 0.0
     each_type_stat: Dict[str, TypeStatStruct] = dict()
 
     def __init__(self, type_list):
@@ -45,18 +45,18 @@ class StatStruct:
         return self._type_list
 
     def calc_average(self):
-        if self.n_sentence != 0:
-            self.n_token_per_sentence = round(self.n_token / self.n_sentence, 2)
-            self.n_entity_per_sentence = round(self.n_entity / self.n_sentence, 2)
+        if self.n_passage != 0:
+            self.n_token_per_passage = round(self.n_token / self.n_passage, 2)
+            self.n_entity_per_passage = round(self.n_entity / self.n_passage, 2)
 
     def __repr__(self):
         newline = "\n"
         return (
-            f"Total number of sentence in data set  : {self.n_sentence}\n"
+            f"Total number of passage in data set  : {self.n_passage}\n"
             f"Total number of tokens in data set    : {self.n_token}\n"
             f"Total number of entities in data set  : {self.n_entity}\n"
-            f"Average number of token per sentence  : {self.n_token_per_sentence}\n"
-            f"Average number of entity per sentence : {self.n_entity_per_sentence}\n"
+            f"Average number of token per passage  : {self.n_token_per_passage}\n"
+            f"Average number of entity per passage : {self.n_entity_per_passage}\n"
             f'{newline.join(f"{typestat}" for type, typestat in self.each_type_stat.items())}'
         )
 

@@ -53,8 +53,8 @@ class StatStruct:
         newline = "\n"
         return (
             f"Total number of passage in data set  : {self.n_passage}\n"
-            f"Total number of tokens in data set    : {self.n_token}\n"
-            f"Total number of entities in data set  : {self.n_entity}\n"
+            f"Total number of tokens in data set   : {self.n_token}\n"
+            f"Total number of entities in data set : {self.n_entity}\n"
             f"Average number of token per passage  : {self.n_token_per_passage}\n"
             f"Average number of entity per passage : {self.n_entity_per_passage}\n"
             f'{newline.join(f"{typestat}" for type, typestat in self.each_type_stat.items())}'

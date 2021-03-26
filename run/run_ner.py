@@ -9,7 +9,6 @@ import sys
 
 sys.path.append(os.getcwd())
 from run.args import DataTrainingArguments, ModelArguments
-from utils.feature_generation import load_dataset_genia
 from transformers import HfArgumentParser, TrainingArguments, set_seed
 from datasets import load_dataset
 

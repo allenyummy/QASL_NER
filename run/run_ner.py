@@ -55,6 +55,20 @@ def main():
     )
     logger.debug(dataset)
 
+    logger.info("=== Preprocess With Input_ids, Attention_masks, Token_type_ids ===")
+
+    logger.info("============ Set Config, Tokenizer, Pretrained Model ============")
+
+    logger.info("============ Set DataCollator ============")
+
+    logger.info("============ Set Trainer ============")
+
+    logger.info("============ Training ============")
+
+    logger.info("============ Evaluation ============")
+
+    logger.info("============ Prediction ============")
+
 
 if __name__ == "__main__":
     main()

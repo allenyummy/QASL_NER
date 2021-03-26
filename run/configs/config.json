@@ -1,7 +1,8 @@
 {
     "dataset_name": "genia",
-    "dataset_script_file": "/Users/allenyummy/Documents/QASL_NER/utils/feature_generation/script/load_dataset_genia.py",
+    "dataset_script_file": "utils/feature_generation/script/load_dataset_genia.py",
     "dataset_config_name": "genia_mrc",
+    "data_dir": "dataset/GENIAcorpus3.02p/mrc",
     "max_seq_length": 512,
     "overwrite_cache": false,
     "model_name_or_path": "hfl/chinese-bert-wwm",

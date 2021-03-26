@@ -5,8 +5,11 @@
 from __future__ import absolute_import, division, print_function
 import json
 import os
+from typing import Optional
 import datasets
 from utils.data_structure.mrc import dict2mrcStruct
+from utils.data_structure import tag_scheme
+from utils.feature_generation.strategy import LabelStrategy
 
 _CITATION = """\
 @article{kim2003genia,
@@ -45,7 +48,12 @@ class GENIA_Config(datasets.BuilderConfig):
     BuilderConfig for GENIA.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(
+        self,
+        query_json_file_path: Optional[str] = None,
+        label_strategy: Optional[LabelStrategy] = None,
+        **kwargs,
+    ):
         """
         BuilderConfig for GENIA.
 
@@ -53,32 +61,67 @@ class GENIA_Config(datasets.BuilderConfig):
           **kwargs: keyword arguments forwarded to super.
         """
         super(GENIA_Config, self).__init__(**kwargs)
+        if query_json_file_path and label_strategy:
+            with open(query_json_file_path, "r", encoding="utf-8") as f:
+                self.QUERY = json.load(f)
+            self.LABEL_STRATEGY = label_strategy
 
 
 class GENIA(datasets.GeneratorBasedBuilder):
 
     BUILDER_CONFIGS = [
         GENIA_Config(
-            name="GENIA",
+            name="genia_mrc",
             version=datasets.Version("0.0.0"),
             description="GENIA dataset as machine reading comprehension",
         ),
+        GENIA_Config(
+            name="genia_iob2",
+            version=datasets.Version("0.0.0"),
+            description="GENIA dataset as machine reading comprehension by adapting IOB2 scheme",
+            query_json_file_path=_PATHs["query"],
+            label_strategy=LabelStrategy.IOB2,
+        ),
+        GENIA_Config(
+            name="genia_iobes",
+            version=datasets.Version("0.0.0"),
+            description="GENIA dataset as machine reading comprehension by adapting IOBES scheme",
+            query_json_file_path=_PATHs["query"],
+            label_strategy=LabelStrategy.IOBES,
+        ),
+        GENIA_Config(
+            name="genia_startend",
+            version=datasets.Version("0.0.0"),
+            description="GENIA dataset as machine reading comprehension by adapting start_end ",
+            query_json_file_path=_PATHs["query"],
+            label_strategy=LabelStrategy.STARTEND,
+        ),
     ]
 
-    with open(_PATHs["query"], encoding="utf-8") as f:
-        query = json.load(f)
-
     def _info(self):
+        # if self.config.name == "genia_startend":
+        #     raise NotImplementedError
+        # else:
+        #     if self.LABEL_STRATEGY == tag_scheme.IOB2.__name__:
+        #         class_names = [t.value for t in tag_scheme.IOB2]
+        #     elif self.LABEL_STRATEGY == tag_scheme.IOBES.__name__:
+        #         class_names = [t.value for t in tag_scheme.IOBES]
+        #     else:
+        #         raise ValueError("Now we only support label strategy of IOB2 or IOBES.")
+
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
             features=datasets.Features(
                 {
                     "pid": datasets.Value("string"),
                     "passage": datasets.Value("string"),
+                    "passage_tokens": datasets.features.Sequence(
+                        datasets.Value("string")
+                    ),
                     "answers": datasets.features.Sequence(
                         {
-                            "text": datasets.Value("string"),
                             "type": datasets.Value("string"),
+                            "text": datasets.Value("string"),
                             "start_pos": datasets.Value("int32"),
                             "end_pos": datasets.Value("int32"),
                         }
@@ -95,7 +138,9 @@ class GENIA(datasets.GeneratorBasedBuilder):
         Returns SplitGenerators.
         """
 
-        loaded_files = dl_manager.download_and_extract(_PATHs)
+        loaded_files = dl_manager.download_and_extract(
+            self.config.data_files if self.config.data_files else _PATHs
+        )
         return [
             datasets.SplitGenerator(
                 name=datasets.Split.TRAIN,
@@ -115,7 +160,6 @@ class GENIA(datasets.GeneratorBasedBuilder):
         """
         Yields examples.
         """
-        print(self.query)
 
         with open(filepath, encoding="utf-8") as f:
             genia = json.load(f)
@@ -127,10 +171,11 @@ class GENIA(datasets.GeneratorBasedBuilder):
                 yield id_, {
                     "pid": d.pid,
                     "passage": d.passage,
+                    "passage_tokens": d.passage.split(),
                     "answers": [
                         {
-                            "text": ans.text,
                             "type": ans.type,
+                            "text": ans.text,
                             "start_pos": ans.start_pos,
                             "end_pos": ans.end_pos,
                         }

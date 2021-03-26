@@ -1,6 +1,6 @@
 {
     "dataset_name": "genia",
-    "dataset_script_file": "/Users/allenyummy/Documents/QASL_NER/utils/feature_generation/load_dataset_genia.py",
+    "dataset_script_file": "/Users/allenyummy/Documents/QASL_NER/utils/feature_generation/script/load_dataset_genia.py",
     "dataset_config_name": "genia_mrc",
     "max_seq_length": 512,
     "overwrite_cache": false,

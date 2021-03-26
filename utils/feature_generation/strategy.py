@@ -20,6 +20,7 @@ class TruncationStrategy(Enum):
     LONGEST_FIRST = "longest_first"
 
 
-class ExtractStrategy(Enum):
+class LabelStrategy(Enum):
     IOB2 = "iob2"
     IOBES = "iobes"
+    STARTEND = "startend"

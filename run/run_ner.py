@@ -49,7 +49,9 @@ def main():
 
     logger.info("============ Load Dataset ============")
     dataset = load_dataset(
-        path=data_args.dataset_script_file, name=data_args.dataset_config_name
+        path=data_args.dataset_script_file,
+        name=data_args.dataset_config_name,
+        cache_dir=data_args.data_dir,
     )
     logger.debug(dataset)
 

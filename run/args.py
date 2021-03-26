@@ -23,8 +23,7 @@ class DataTrainingArguments:
             "help": "The configuration name of the dataset to use (via the datasets library)."
         },
     )
-    data_dir: Optional[str] = field(
-        default=None,
+    data_dir: str = field(
         metadata={"help": "The input data dir."},
     )
     train_file: Optional[str] = field(

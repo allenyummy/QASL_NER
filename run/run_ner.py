@@ -8,9 +8,11 @@ import os
 import sys
 
 sys.path.append(os.getcwd())
+import run.globals as globals
 from run.args import DataTrainingArguments, ModelArguments
-from transformers import HfArgumentParser, TrainingArguments, set_seed
+from transformers import HfArgumentParser, TrainingArguments, set_seed, AutoTokenizer
 from datasets import load_dataset
+from utils.feature_generation.feature_generation import tokenize_and_align_labels
 
 logging.config.fileConfig("logging.conf")
 logger = logging.getLogger(__name__)
@@ -47,6 +49,16 @@ def main():
     set_seed(training_args.seed)
     logger.debug(f"seed: {training_args.seed}")
 
+    logger.info("============ Set Config, Tokenizer, Pretrained Model ============")
+
+    globals.tokenizer = AutoTokenizer.from_pretrained(
+        model_args.tokenizer_name
+        if model_args.tokenizer_name
+        else model_args.model_name_or_path,
+        cache_dir=model_args.cache_dir,
+        use_fast=True,
+    )
+
     logger.info("============ Load Dataset ============")
     dataset = load_dataset(
         path=data_args.dataset_script_file,
@@ -55,9 +67,15 @@ def main():
     )
     logger.debug(dataset)
 
-    logger.info("=== Preprocess With Input_ids, Attention_masks, Token_type_ids ===")
-
-    logger.info("============ Set Config, Tokenizer, Pretrained Model ============")
+    logger.info("============ Create Features ============")
+    train_dataset = dataset["train"]
+    train_dataset = train_dataset.map(
+        tokenize_and_align_labels,
+        batched=True,
+        num_proc=None,
+        load_from_cache_file=False,
+    )
+    print(train_dataset[0])
 
     logger.info("============ Set DataCollator ============")
 

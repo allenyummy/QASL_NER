@@ -44,6 +44,7 @@ def main():
         bool(training_args.local_rank != -1),
         training_args.fp16,
     )
+    globals.
 
     logger.info("============ Set Seed ============")
     set_seed(training_args.seed)

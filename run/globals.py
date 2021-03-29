@@ -4,3 +4,7 @@
 
 
 global tokenizer
+global max_seq_length
+global doc_stride
+global padding_strategy
+global label_strategy

@@ -14,7 +14,7 @@ et-xmlfile==1.0.1; python_version >= "3.6"
 filelock==3.0.12; python_full_version >= "3.6.0"
 flask==1.1.2; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.5.0")
 fsspec==0.8.7; python_version > "3.6"
-gunicorn==20.0.4; python_version >= "3.4"
+gunicorn==20.1.0; python_version >= "3.5"
 huggingface-hub==0.0.7; python_full_version >= "3.6.0"
 idna==2.10; python_version >= "3.5" and python_full_version < "3.0.0" or python_full_version >= "3.5.0" and python_version >= "3.5"
 itsdangerous==1.1.0; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.5.0"
@@ -24,7 +24,7 @@ markupsafe==1.1.1; python_version >= "2.7" and python_full_version < "3.0.0" or 
 more-itertools==8.7.0; python_version >= "3.5"
 multiprocess==0.70.11.1
 mypy-extensions==0.4.3; python_version >= "3.6"
-numpy==1.20.1; python_version >= "3.7" and python_full_version >= "3.7.1"
+numpy==1.20.2; python_version >= "3.7" and python_full_version >= "3.7.1"
 openpyxl==3.0.7; python_version >= "3.6"
 packaging==20.9; python_full_version >= "3.6.0" and python_version >= "3.5" and (python_version >= "3.5" and python_full_version < "3.0.0" or python_full_version >= "3.4.0" and python_version >= "3.5")
 pandas==1.2.3; python_full_version >= "3.7.1"
@@ -49,8 +49,8 @@ six==1.15.0; python_full_version >= "3.7.1"
 threadpoolctl==2.1.0; python_version >= "3.6"
 tokenizers==0.10.1; python_full_version >= "3.6.0"
 toml==0.10.2; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.3.0" and python_version >= "3.6"
-torch==1.8.0; python_full_version >= "3.6.2"
-torchtext==0.9.0; python_version >= "3.5"
+torch==1.8.1; python_full_version >= "3.6.2"
+torchtext==0.9.1; python_version >= "3.5"
 tqdm==4.49.0; python_full_version >= "3.6.0" and python_version >= "3.5" and (python_version >= "2.6" and python_full_version < "3.0.0" or python_full_version >= "3.2.0")
 transformers==4.4.2; python_full_version >= "3.6.0"
 typed-ast==1.4.2; python_version >= "3.6"

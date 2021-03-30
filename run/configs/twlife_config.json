@@ -8,7 +8,7 @@
     "doc_stride": 128,
     "padding_strategy": "max_length",
     "label_strategy": "iob2",
-    "model_name_or_path": "bert-base-uncased",
+    "model_name_or_path": "hfl/chinese-bert-wwm",
     "cache_dir": null,
     "output_dir": "exp/",
     "num_train_epochs": 40,

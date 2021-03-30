@@ -1,6 +1,6 @@
 {
     "dataset_name": "twlife",
-    "dataset_script_file": "utils/feature_generation/script/load_dataset_twlife.py",
+    "dataset_script_file": "utils/data_loading_script/load_dataset_twlife.py",
     "dataset_config_name": "twlife_mrc",
     "data_dir": "dataset/twlife/mrc",
     "overwrite_cache": false,

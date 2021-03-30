@@ -7,9 +7,6 @@ import json
 import os
 from typing import Optional
 import datasets
-from utils.data_structure.mrc import dict2mrcStruct
-from utils.data_structure import tag_scheme
-from utils.feature_generation.strategy import LabelStrategy
 
 _CITATION = """\
 @article{kim2003genia,
@@ -51,7 +48,6 @@ class GENIA_Config(datasets.BuilderConfig):
     def __init__(
         self,
         query_json_file_path: Optional[str] = None,
-        label_strategy: Optional[LabelStrategy] = None,
         **kwargs,
     ):
         """
@@ -61,10 +57,9 @@ class GENIA_Config(datasets.BuilderConfig):
           **kwargs: keyword arguments forwarded to super.
         """
         super(GENIA_Config, self).__init__(**kwargs)
-        if query_json_file_path and label_strategy:
+        if query_json_file_path:
             with open(query_json_file_path, "r", encoding="utf-8") as f:
                 self.QUERY = json.load(f)
-            self.LABEL_STRATEGY = label_strategy
 
 
 class GENIA(datasets.GeneratorBasedBuilder):
@@ -76,25 +71,10 @@ class GENIA(datasets.GeneratorBasedBuilder):
             description="GENIA dataset as machine reading comprehension",
         ),
         GENIA_Config(
-            name="genia_iob2",
-            version=datasets.Version("0.0.0"),
-            description="GENIA dataset as machine reading comprehension by adapting IOB2 scheme",
-            query_json_file_path=_PATHs["query"],
-            label_strategy=LabelStrategy.IOB2,
-        ),
-        GENIA_Config(
-            name="genia_iobes",
-            version=datasets.Version("0.0.0"),
-            description="GENIA dataset as machine reading comprehension by adapting IOBES scheme",
-            query_json_file_path=_PATHs["query"],
-            label_strategy=LabelStrategy.IOBES,
-        ),
-        GENIA_Config(
             name="genia_startend",
             version=datasets.Version("0.0.0"),
             description="GENIA dataset as machine reading comprehension by adapting start_end ",
             query_json_file_path=_PATHs["query"],
-            label_strategy=LabelStrategy.STARTEND,
         ),
     ]
 
@@ -163,22 +143,19 @@ class GENIA(datasets.GeneratorBasedBuilder):
 
         with open(filepath, encoding="utf-8") as f:
             genia = json.load(f)
-            mrc = dict2mrcStruct(genia)
-            for id_, d in enumerate(mrc.data):
-                pid = d.pid
-                passage = d.passage
-                answers = d.answers
-                yield id_, {
-                    "pid": d.pid,
-                    "passage": d.passage,
-                    "passage_tokens": d.passage.split(),
-                    "answers": [
-                        {
-                            "type": ans.type,
-                            "text": ans.text,
-                            "start_pos": ans.start_pos,
-                            "end_pos": ans.end_pos,
-                        }
-                        for ans in answers
-                    ],
-                }
+
+        for id_, d in enumerate(genia["data"]):
+            yield id_, {
+                "pid": d["pid"],
+                "passage": d["passage"],
+                "passage_tokens": d["passage"].split(),
+                "answers": [
+                    {
+                        "type": ans["type"],
+                        "text": ans["text"],
+                        "start_pos": ans["start_pos"],
+                        "end_pos": ans["end_pos"],
+                    }
+                    for ans in d["answers"]
+                ],
+            }

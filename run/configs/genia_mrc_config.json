@@ -1,7 +1,7 @@
 {
     "dataset_name": "genia",
     "dataset_script_file": "utils/data_loading_script/load_dataset_genia.py",
-    "dataset_config_name": "genia",
+    "dataset_config_name": "genia_mrc",
     "data_dir": "dataset/GENIAcorpus3.02p/mrc",
     "overwrite_cache": false,
     "max_seq_length": 512,

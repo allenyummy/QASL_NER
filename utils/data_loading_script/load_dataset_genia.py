@@ -59,55 +59,48 @@ class GENIA_Config(datasets.BuilderConfig):
         super(GENIA_Config, self).__init__(**kwargs)
         if query_json_file_path:
             with open(query_json_file_path, "r", encoding="utf-8") as f:
-                self.QUERY = json.load(f)
+                self.QUERIES = json.load(f)
 
 
 class GENIA(datasets.GeneratorBasedBuilder):
 
     BUILDER_CONFIGS = [
         GENIA_Config(
-            name="genia_mrc",
+            name="genia",
             version=datasets.Version("0.0.0"),
-            description="GENIA dataset as machine reading comprehension",
+            description="GENIA dataset",
         ),
         GENIA_Config(
-            name="genia_startend",
+            name="genia_mrc",
             version=datasets.Version("0.0.0"),
-            description="GENIA dataset as machine reading comprehension by adapting start_end ",
+            description="GENIA dataset as machine reading comprehension by adapting queries",
             query_json_file_path=_PATHs["query"],
         ),
     ]
 
     def _info(self):
-        # if self.config.name == "genia_startend":
-        #     raise NotImplementedError
-        # else:
-        #     if self.LABEL_STRATEGY == tag_scheme.IOB2.__name__:
-        #         class_names = [t.value for t in tag_scheme.IOB2]
-        #     elif self.LABEL_STRATEGY == tag_scheme.IOBES.__name__:
-        #         class_names = [t.value for t in tag_scheme.IOBES]
-        #     else:
-        #         raise ValueError("Now we only support label strategy of IOB2 or IOBES.")
+        features = dict()
+        # --- necessary features ----
+        features["pid"] = datasets.Value("string")
+        features["passage"] = datasets.Value("string")
+        features["passage_tokens"] = datasets.features.Sequence(
+            datasets.Value("string")
+        )
+        features["answers"] = datasets.features.Sequence(
+            {
+                "type": datasets.Value("string"),
+                "text": datasets.Value("string"),
+                "start_pos": datasets.Value("int32"),
+                "end_pos": datasets.Value("int32"),
+            }
+        )
+        # --- conditional features ---
+        if self.config.name == "genia_mrc":
+            features["question"] = datasets.Value("string")
 
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
-            features=datasets.Features(
-                {
-                    "pid": datasets.Value("string"),
-                    "passage": datasets.Value("string"),
-                    "passage_tokens": datasets.features.Sequence(
-                        datasets.Value("string")
-                    ),
-                    "answers": datasets.features.Sequence(
-                        {
-                            "type": datasets.Value("string"),
-                            "text": datasets.Value("string"),
-                            "start_pos": datasets.Value("int32"),
-                            "end_pos": datasets.Value("int32"),
-                        }
-                    ),
-                }
-            ),
+            features=datasets.Features(features),
             supervised_keys=None,
             homepage=_HOMEPAGE,
             citation=_CITATION,
@@ -144,18 +137,49 @@ class GENIA(datasets.GeneratorBasedBuilder):
         with open(filepath, encoding="utf-8") as f:
             genia = json.load(f)
 
-        for id_, d in enumerate(genia["data"]):
-            yield id_, {
-                "pid": d["pid"],
-                "passage": d["passage"],
-                "passage_tokens": d["passage"].split(),
-                "answers": [
-                    {
-                        "type": ans["type"],
-                        "text": ans["text"],
-                        "start_pos": ans["start_pos"],
-                        "end_pos": ans["end_pos"],
-                    }
-                    for ans in d["answers"]
-                ],
-            }
+        if self.config.name == "genia":
+            for id_, d in enumerate(genia["data"]):
+                yield id_, {
+                    "pid": d["pid"],
+                    "passage": d["passage"],
+                    "passage_tokens": d["passage"].split(),
+                    "answers": [
+                        {
+                            "type": ans["type"],
+                            "text": ans["text"],
+                            "start_pos": ans["start_pos"],
+                            "end_pos": ans["end_pos"],
+                        }
+                        for ans in d["answers"]
+                    ],
+                }
+        elif self.config.name == "genia_mrc":
+            id_ = 0
+            for d in genia["data"]:
+                example = {
+                    "pid": d["pid"],
+                    "passage": d["passage"],
+                    "passage_tokens": d["passage"].split(),
+                }
+                for tag, q_text in self.config.QUERIES.items():
+                    example["question"] = q_text
+                    example["answers"] = [
+                        {
+                            "type": tag,
+                            "text": "",
+                            "start_pos": -1,
+                            "end_pos": -1,
+                        }
+                    ]
+                    for ans in d["answers"]:
+                        if tag == ans["type"]:
+                            example["answers"] = [
+                                {
+                                    "type": ans["type"],
+                                    "text": ans["text"],
+                                    "start_pos": ans["start_pos"],
+                                    "end_pos": ans["end_pos"],
+                                }
+                            ]
+                    yield id_, example
+                    id_ += 1

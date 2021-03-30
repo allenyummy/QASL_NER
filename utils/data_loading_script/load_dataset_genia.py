@@ -163,23 +163,25 @@ class GENIA(datasets.GeneratorBasedBuilder):
                 }
                 for tag, q_text in self.config.QUERIES.items():
                     example["question"] = q_text
-                    example["answers"] = [
-                        {
-                            "type": tag,
-                            "text": "",
-                            "start_pos": -1,
-                            "end_pos": -1,
-                        }
-                    ]
+                    example["answers"] = list()
                     for ans in d["answers"]:
                         if tag == ans["type"]:
-                            example["answers"] = [
+                            example["answers"].append(
                                 {
                                     "type": ans["type"],
                                     "text": ans["text"],
                                     "start_pos": ans["start_pos"],
                                     "end_pos": ans["end_pos"],
                                 }
-                            ]
+                            )
+                    if not example["answers"]:
+                        example["answers"] = [
+                            {
+                                "type": tag,
+                                "text": None,
+                                "start_pos": -1,
+                                "end_pos": -1,
+                            }
+                        ]
                     yield id_, example
                     id_ += 1

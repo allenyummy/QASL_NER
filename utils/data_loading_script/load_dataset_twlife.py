@@ -47,39 +47,48 @@ class TWLIFE_Config(datasets.BuilderConfig):
         super(TWLIFE_Config, self).__init__(**kwargs)
         if query_json_file_path:
             with open(query_json_file_path, "r", encoding="utf-8") as f:
-                self.QUERY = json.load(f)
+                self.QUERIES = json.load(f)
 
 
 class TWLIFE(datasets.GeneratorBasedBuilder):
 
     BUILDER_CONFIGS = [
         TWLIFE_Config(
+            name="twlife",
+            version=datasets.Version("0.0.0"),
+            description="TWLIFE dataset",
+        ),
+        TWLIFE_Config(
             name="twlife_mrc",
             version=datasets.Version("0.0.0"),
-            description="TWLIFE dataset as machine reading comprehension",
+            description="TWLIFE dataset as machine reading comprehension by adapting queries",
+            query_json_file_path=_PATHs["query"],
         ),
     ]
 
     def _info(self):
+        features = dict()
+        # --- necessary features ----
+        features["pid"] = datasets.Value("int32")
+        features["passage"] = datasets.Value("string")
+        features["passage_tokens"] = datasets.features.Sequence(
+            datasets.Value("string")
+        )
+        features["answers"] = datasets.features.Sequence(
+            {
+                "type": datasets.Value("string"),
+                "text": datasets.Value("string"),
+                "start_pos": datasets.Value("int32"),
+                "end_pos": datasets.Value("int32"),
+            }
+        )
+        # --- conditional features ---
+        if self.config.name == "twlife_mrc":
+            features["question"] = datasets.Value("string")
+
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
-            features=datasets.Features(
-                {
-                    "pid": datasets.Value("int32"),
-                    "passage": datasets.Value("string"),
-                    "passage_tokens": datasets.features.Sequence(
-                        datasets.Value("string")
-                    ),
-                    "answers": datasets.features.Sequence(
-                        {
-                            "type": datasets.Value("string"),
-                            "text": datasets.Value("string"),
-                            "start_pos": datasets.Value("int32"),
-                            "end_pos": datasets.Value("int32"),
-                        }
-                    ),
-                }
-            ),
+            features=datasets.Features(features),
             supervised_keys=None,
             homepage=_HOMEPAGE,
             citation=_CITATION,
@@ -116,18 +125,50 @@ class TWLIFE(datasets.GeneratorBasedBuilder):
         with open(filepath, encoding="utf-8") as f:
             twlife = json.load(f)
 
-        for id_, d in enumerate(twlife["data"]):
-            yield id_, {
-                "pid": d["pid"],
-                "passage": d["passage"],
-                "passage_tokens": d["passage_tokens"],
-                "answers": [
-                    {
-                        "type": ans["type"],
-                        "text": ans["text"],
-                        "start_pos": ans["start_pos"],
-                        "end_pos": ans["end_pos"],
-                    }
-                    for ans in d["nested_ne_answers"]
-                ],
-            }
+        if self.config.name == "twlife":
+            for id_, d in enumerate(twlife["data"]):
+                yield id_, {
+                    "pid": d["pid"],
+                    "passage": d["passage"],
+                    "passage_tokens": d["passage_tokens"],
+                    "answers": [
+                        {
+                            "type": ans["type"],
+                            "text": ans["text"],
+                            "start_pos": ans["start_pos"],
+                            "end_pos": ans["end_pos"],
+                        }
+                        for ans in d["nested_ne_answers"]
+                    ],
+                }
+
+        elif self.config.name == "twlife_mrc":
+            id_ = 0
+            for d in twlife["data"]:
+                example = {
+                    "pid": d["pid"],
+                    "passage": d["passage"],
+                    "passage_tokens": d["passage_tokens"],
+                }
+                for tag, q_text in self.config.QUERIES.items():
+                    example["question"] = q_text
+                    example["answers"] = [
+                        {
+                            "type": tag,
+                            "text": "",
+                            "start_pos": -1,
+                            "end_pos": -1,
+                        }
+                    ]
+                    for ans in d["nested_ne_answers"]:
+                        if tag == ans["type"]:
+                            example["answers"] = [
+                                {
+                                    "type": ans["type"],
+                                    "text": ans["text"],
+                                    "start_pos": ans["start_pos"],
+                                    "end_pos": ans["end_pos"],
+                                }
+                            ]
+                    yield id_, example
+                    id_ += 1

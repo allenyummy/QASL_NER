@@ -81,12 +81,21 @@ def main():
 
     logger.info("============ Create Features ============")
     train_dataset = dataset["train"].select(range(1))
+    column_names = train_dataset.column_names
     train_dataset = train_dataset.map(
         tokenize_and_align_labels,
-        batched=False,
-        load_from_cache_file=not data_args.overwrite_cache,
+        batched=True,
+        # load_from_cache_file=not data_args.overwrite_cache,
+        load_from_cache_file=False,
+        remove_columns=column_names,
     )
-    logger.debug(train_dataset[0])
+    logger.info(train_dataset)
+    for i in range(len(train_dataset)):
+        logger.debug(
+            globals.tokenizer.convert_ids_to_tokens(train_dataset[i]["input_ids"])
+        )
+        logger.debug(train_dataset[i])
+        logger.debug("")
 
     logger.info("============ Set DataCollator ============")
 

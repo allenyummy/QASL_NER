@@ -10,7 +10,13 @@ import sys
 sys.path.append(os.getcwd())
 import run.globals as globals
 from run.args import DataTrainingArguments, ModelArguments
-from transformers import HfArgumentParser, TrainingArguments, set_seed, AutoTokenizer
+from transformers import (
+    HfArgumentParser,
+    TrainingArguments,
+    set_seed,
+    AutoConfig,
+    AutoTokenizer,
+)
 from datasets import load_dataset
 from utils.feature_generation.feature_generation import tokenize_and_align_labels
 
@@ -51,6 +57,14 @@ def main():
 
     logger.info("============ Set Config, Tokenizer, Pretrained Model ============")
 
+    config = AutoConfig.from_pretrained(
+        model_args.config_name
+        if model_args.config_name
+        else model_args.model_name_or_path,
+        cache_dir=model_args.cache_dir,
+    )
+    logger.debug(f"config: {config}")
+
     globals.tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name
         if model_args.tokenizer_name
@@ -85,8 +99,7 @@ def main():
     train_dataset = train_dataset.map(
         tokenize_and_align_labels,
         batched=True,
-        # load_from_cache_file=not data_args.overwrite_cache,
-        load_from_cache_file=False,
+        load_from_cache_file=not data_args.overwrite_cache,
         remove_columns=column_names,
     )
     logger.info(train_dataset)
@@ -97,9 +110,8 @@ def main():
         logger.debug(train_dataset[i])
         logger.debug("")
 
-    logger.info("============ Set DataCollator ============")
-
     logger.info("============ Set Trainer ============")
+    # trainer = Trainer()
 
     logger.info("============ Training ============")
 

@@ -10,3 +10,6 @@ global padding_strategy
 global label_strategy
 global pad_on_right
 global label_to_id
+global id_to_label
+global label_list
+global metric

@@ -100,8 +100,7 @@ class MRCStruct(NamedTuple):
         )
 
 
-def trans2dict(mrc: MRCStruct):
-
+def trans2dict(mrc: MRCStruct) -> dict:
     data_list = list()
     data_dict = dict()
     for data in mrc.data:
@@ -118,6 +117,22 @@ def trans2dict(mrc: MRCStruct):
     return mrc_dict
 
 
+def dict2mrcStruct(mrc_dict: dict) -> MRCStruct:
+    built_time = mrc_dict["built_time"]
+    version = mrc_dict["version"]
+    data = list()
+    for d in mrc_dict["data"]:
+        pid = d["pid"]
+        passage = d["passage"]
+        answers = list()
+        for a in d["answers"]:
+            ans = AnswerStruct(**a)
+            answers.append(ans)
+        data.append(DataStruct(pid=pid, passage=passage, answers=answers))
+    mrc = MRCStruct(built_time=built_time, version=version, data=data)
+    return mrc
+
+
 if __name__ == "__main__":
 
     a_e = AnswerStruct(text="gg", type="ff", start_pos=2, end_pos=4)
@@ -130,4 +145,10 @@ if __name__ == "__main__":
     print(AnswerStruct.__doc__)
 
     print(a_e == a_s)
-    print(trans2dict(b))
+
+    b_dict = trans2dict(b)
+    c = dict2mrcStruct(b_dict)
+    print(b_dict)
+    print(c)
+    for i in c.data:
+        print(i)

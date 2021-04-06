@@ -45,6 +45,7 @@ def tokenize_and_align_labels(batched_examples):
     for idx, example_id in enumerate(sample_mapping):
         label_ids = list()
 
+        # [CLS, ......     , SEP, ......                             SEP ]
         # [None, 0, 1, 2, 3, None, 0, 0, 1, 2, 3, 3, 4, 5, 6, 7, ... None]
         word_ids = batched_tokenized_inputs.word_ids(batch_index=idx)
 
@@ -53,35 +54,46 @@ def tokenize_and_align_labels(batched_examples):
 
         # The first passage tokens is behind [SEP] tokens
         first_passage_token_in_word_ids = first_sep_token_in_word_ids + 1
+        after_first_sep = word_ids[first_passage_token_in_word_ids:]
+        after_first_sep_len = len(after_first_sep)
 
         # [CLS] Question [SEP] Passage [SEP] [PAD] ..
         #  -100, -100... -100
-        label_ids.extend([pad_token_label_id] * (first_sep_token_in_word_ids + 1))
+        label_ids.extend([pad_token_label_id] * first_passage_token_in_word_ids)
 
         # [CLS] Question [SEP] Passage [SEP] [PAD] ...
         #                      ........ -100 -100 ...
         answers = batched_answers[example_id]
+
+        passage_label_ids = [pad_token_label_id] * after_first_sep_len
         for type, text, start, end in zip(
             answers["type"], answers["text"], answers["start_pos"], answers["end_pos"]
         ):
             prev_word_id = None
-            for word_id in word_ids[first_passage_token_in_word_ids:]:
+            for idx, word_id in enumerate(after_first_sep):
                 if word_id is None:
-                    label_ids.append(pad_token_label_id)
+                    pass
                 elif word_id != prev_word_id:
                     if (
                         globals.label_strategy.lower()
                         == LabelStrategy.IOB2._name_.lower()
                     ):
                         if word_id == start:
-                            label_ids.append(globals.label_to_id[IOB2.BEGINNING.value])
+                            passage_label_ids[idx] = globals.label_to_id[
+                                IOB2.BEGINNING.value
+                            ]
                         elif start < word_id <= end:
-                            label_ids.append(globals.label_to_id[IOB2.INSIDE.value])
+                            passage_label_ids[idx] = globals.label_to_id[
+                                IOB2.INSIDE.value
+                            ]
                         else:
-                            label_ids.append(globals.label_to_id[IOB2.OUTSIDE.value])
+                            passage_label_ids[idx] = globals.label_to_id[
+                                IOB2.OUTSIDE.value
+                            ]
                 else:
-                    label_ids.append(pad_token_label_id)
+                    pass
                 prev_word_id = word_id
+        label_ids.extend(passage_label_ids)
         labels.append(label_ids)
     batched_tokenized_inputs["labels"] = labels
     return batched_tokenized_inputs

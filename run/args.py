@@ -46,6 +46,12 @@ class DataTrainingArguments:
         default=False,
         metadata={"help": "Overwrite the cached training and evaluation sets"},
     )
+    additional_tokens_file: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Add tokens that are might not in vocab.txt and we do not want them to be as [UNK] tokens after tokenization."
+        },
+    )
     preprocessing_num_workers: Optional[int] = field(
         default=None,
         metadata={"help": "The number of processes to use for the preprocessing."},

@@ -4,6 +4,7 @@
     "dataset_config_name": "twlife",
     "data_dir": "dataset/twlife/mrc",
     "overwrite_cache": false,
+    "additional_tokens_file": "dataset/twlife/mrc/add_tokens.txt",
     "max_seq_length": 512,
     "doc_stride": 128,
     "padding_strategy": "max_length",

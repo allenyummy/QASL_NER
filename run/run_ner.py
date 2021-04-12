@@ -103,6 +103,18 @@ def main():
         cache_dir=model_args.cache_dir,
     )
 
+    logger.info("============ Add tokens that are might not in vocab.txt ============")
+    if not data_args.additional_tokens_file:
+        logger.info("Nothing to add")
+    else:
+        with open(data_args.additional_tokens_file, "r", encoding="utf-8") as f:
+            add_tokens = f.read().splitlines()
+            globals.tokenizer.add_tokens(add_tokens)
+            logger.info(f"Add {len(add_tokens)} tokens: {add_tokens}")
+            logger.info(f"Original vocab size: {config.vocab_size}")
+            model.resize_token_embeddings(len(globals.tokenizer))
+            logger.info(f"Now vocab size: {config.vocab_size}")
+
     logger.info("============ Load Metirc ============")
 
     globals.metric = load_metric("seqeval")

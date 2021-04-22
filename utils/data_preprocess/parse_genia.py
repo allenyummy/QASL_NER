@@ -1,7 +1,21 @@
 # encoding=utf-8
 # Author: Yu-Lun Chiang
 # Description: Parse GENIAcorpus3.02p
-# **Trouble** depth=2 G#RNA MEDLINE:96379940-abstract-11
+
+# 有些實體在文本中出現兩次以上，但XML檔裡僅標記一個實體，這種狀況共有610個Examples。(一個句子是一個Example)
+# 舉例：
+# MEDLINE: MEDLINE:96226053
+# ABSTRACT: The Id ( inhibitor of DNA binding and differentiation ) HLH proteins , in a dominantly negative fashion , regulate transcriptional activities of basic HLH proteins .
+# MARK: [(G#protein_family_or_group, Id, None, None), (G#other_name, inhibitor of DNA binding and differentiation, None, None), (G#protein_family_or_group, HLH proteins, None, None), (G#other_name, transcriptional activities, None, None), (G#protein_family_or_group, basic HLH proteins, None, None)]
+# MARK_PT: [(G#protein, Id, None, None), (G#protein, HLH proteins, None, None), (G#protein, basic HLH proteins, None, None)]
+# MRC_DS:
+# [  PID  ]: MEDLINE:96226053-abstract-2
+# [PASSAGE]: The Id ( inhibitor of DNA binding and differentiation ) HLH proteins , in a dominantly negative fashion , regulate transcriptional activities of basic HLH proteins .
+# [ANSWERS]:
+# (G#protein, Id, 1, 2)
+# (G#protein, HLH proteins, 10, 12)
+# (G#protein, basic HLH proteins, 23, 26)
+# (G#protein, HLH proteins, 24, 26)
 
 import logging
 import os
@@ -18,7 +32,7 @@ from utils.data_structure.mrc import AnswerStruct, DataStruct, MRCStruct, trans2
 from utils.data_structure.stat import StatStruct
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 
 class GENIA(MRC_Preprocessing):
@@ -78,8 +92,13 @@ class GENIA(MRC_Preprocessing):
                 for w in child.iterfind(xpath):
                     text_list = " ".join(w.itertext()).split()
                     mark_list = self.__parse2mrc__get_mark_list(w)
+                    mark_list_pt = (
+                        self.__parse2mrc__prune_unnecessary_marks_and_transform(
+                            mark_list
+                        )
+                    )
                     ans_list = self.__parse2mrc__get_answer_position_from_text(
-                        text_list, mark_list
+                        text_list, mark_list_pt
                     )
                     mrc_ds = self.__parse2mrc__format(
                         medline, category, sentence_idx, text_list, ans_list
@@ -91,6 +110,7 @@ class GENIA(MRC_Preprocessing):
                         logger.debug(f"MEDLINE: {medline}")
                         logger.debug(f"{category.upper()}: {' '.join(text_list)}")
                         logger.debug(f"MARK: {mark_list}")
+                        logger.debug(f"MARK_PT: {mark_list_pt}")
                         logger.debug(f"MRC_DS: {mrc_ds}")
                         logger.debug("------------")
         return data
@@ -247,24 +267,33 @@ class GENIA(MRC_Preprocessing):
             rtype: `mrc.AnswerStruct`
         """
 
-        mark_list_pt = self.__parse2mrc__prune_unnecessary_marks_and_transform(
-            mark_list
-        )
+        mark_set = set(mark_list)
+
         ans_list = list()
-        pointer = 0
-        for mark in mark_list_pt:
+        for mark in mark_set:
             ans_text = mark.text
             ans_text_list = mark.text.split()
             type = mark.type
-            pointer = self.__parse2mrc__lookback(ans_list, type, ans_text, pointer)
-            start_pos, end_pos = self.__parse2mrc__find_start_end_position(
-                text_list, ans_text_list, pointer
+            start_pos_list, end_pos_list = self.__parse2mrc__find_start_end_position(
+                text_list, ans_text_list
             )
-            mrc_as = AnswerStruct(
-                type=type, text=ans_text, start_pos=start_pos, end_pos=end_pos
-            )
-            assert self.__parse2mrc__double_check_ans(mrc_as)
-            ans_list.append(mrc_as)
+            if (
+                len(start_pos_list) == 0
+                or len(end_pos_list) == 0
+                or len(start_pos_list) != len(end_pos_list)
+            ):
+                raise ValueError(
+                    f"Find ans ({ans_text}) But got wrong start {start_pos_list} and end {end_pos_list}"
+                )
+
+            else:
+                for start_pos, end_pos in zip(start_pos_list, end_pos_list):
+                    mrc_as = AnswerStruct(
+                        type=type, text=ans_text, start_pos=start_pos, end_pos=end_pos
+                    )
+                    assert self.__parse2mrc__double_check_ans(mrc_as)
+                    ans_list.append(mrc_as)
+
         ans_list = sorted(ans_list, key=lambda k: (k.start_pos, k.end_pos, k.type))
         return ans_list
 
@@ -392,51 +421,9 @@ class GENIA(MRC_Preprocessing):
         return mrc_ds
 
     @staticmethod
-    def __parse2mrc__lookback(
-        ans_list: List[AnswerStruct],
-        appending_ans_type: str,
-        appending_ans_text: str,
-        pointer: int,
-    ) -> int:
-        """
-        Get a right position of pointer by checking the relationship between an answers list and an answer to be inserted.
-        This function is especially used when there are same answer text in different part of a sentence in a given article.
-
-        Args:
-            `ans_list`: An answers list that is previously checked well.
-            `appending_ans_type`: An answer type to be inserted.
-            `appending_ans_text`: An answer text to be inserted.
-            `pointer`: A position of pointer.
-        Type:
-            `ans_list`: list of `mrc.AnswerStruct`
-            `appending_ans_type`: string
-            `appending_ans_text`: string
-            `pointer`: integer
-        Return:
-            A right position of pointer.
-            `rtype`: integer
-        """
-
-        if ans_list:
-            pointer = ans_list[-1].end_pos
-            last_two_ans = ans_list[-2:]
-            for prev_ans in last_two_ans:
-                prev_ans_text = prev_ans.text
-                prev_ans_type = prev_ans.type
-                if appending_ans_text in prev_ans_text:
-                    if appending_ans_text == prev_ans_text:
-                        if appending_ans_type != prev_ans_type:
-                            pointer = prev_ans.start_pos
-                        else:
-                            pointer = prev_ans.end_pos
-                    else:
-                        pointer = prev_ans.start_pos
-        return pointer
-
-    @staticmethod
     def __parse2mrc__find_start_end_position(
-        text_list: List[str], ans_text_list: List[str], pointer: int
-    ) -> Union[int, int]:
+        text_list: List[str], ans_text_list: List[str]
+    ) -> Union[List[int], List[int]]:
         """
         Find start and end position of answer from a given sentence of a article.
         Example:
@@ -449,44 +436,29 @@ class GENIA(MRC_Preprocessing):
         Args:
             `text_list`: a text list of a sentence.
             `ans_text_list`: an text list of an answer.
-            `pointer`: a start position to search position of answer.
         Type:
             `text_list`: list of string
             `ans_text_list`: list of string
-            `pointer`: integer
         Return
             Both start and end position of an answer.
-            `rtype`: integer, integer
+            `rtype`: list of integer, list of integer
         """
 
-        start_pos = -1
-        end_pos = -1
-        ans_len = len(ans_text_list)
-        while pointer < len(text_list) and end_pos == -1:
-            ans_text = " ".join(ans_text_list)
-            text_candidate = " ".join(text_list[pointer : pointer + ans_len])
-            if ans_text != text_candidate:
-                pointer += 1
-            else:
-                start_pos = pointer
-                end_pos = start_pos + ans_len
+        start_pos_list = list()
+        end_pos_list = list()
+        boundary = len(text_list)
+        interval = len(ans_text_list)
 
-        ## check if the answer found is same as the given answer text
-        ## so we re-run this function at the beginning.
-        text = " ".join(text_list)
-        ans_text = " ".join(ans_text_list)
-        ans_text_found = " ".join(text_list[start_pos:end_pos])
-        if ans_text != ans_text_found:
-            logger.debug(
-                f"****** pointer:{pointer} ORIGIN: {ans_text}, BUT FOUND {ans_text_found} {start_pos} {end_pos}\n"
-                f"Mutilple Answers with the same general type, but only one mention in the sentence.\n"
-                f"It may be result of the fact that we prune and transform subtype into general type, or the annotation error."
-            )
-            start_pos, end_pos = GENIA.__parse2mrc__find_start_end_position(
-                text_list, ans_text_list, pointer=0
-            )
-            logger.debug(f"pointer:{pointer} ORIGIN: {ans_text} {start_pos} {end_pos}")
-        return start_pos, end_pos
+        for i, token in enumerate(text_list):
+            if i + interval <= boundary:
+                candidate = text_list[i : i + interval]
+                if candidate == ans_text_list:
+                    start_pos = i
+                    end_pos = start_pos + interval
+                    start_pos_list.append(start_pos)
+                    end_pos_list.append(end_pos)
+
+        return start_pos_list, end_pos_list
 
     @staticmethod
     def __parse2mrc__double_check_ans(mrc_as: AnswerStruct) -> bool:
